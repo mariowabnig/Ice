@@ -64,6 +64,27 @@ extension Bridging {
         }
         return rect
     }
+
+    /// Returns the CGS 32-bit window ID for the given NSWindow by matching its frame
+    /// against the menu bar window list. Needed on macOS 26+ where `NSWindow.windowNumber`
+    /// can exceed `UInt32` range.
+    static func getCGWindowID(for window: NSWindow) -> CGWindowID? {
+        if let id = UInt32(exactly: window.windowNumber) {
+            return CGWindowID(id)
+        }
+        let frame = window.frame
+        guard let screen = NSScreen.main else { return nil }
+        let screenY = screen.frame.height - frame.origin.y - frame.height
+        for candidateID in getWindowList(option: [.onScreen, .menuBarItems]) {
+            guard let candidateFrame = getWindowFrame(for: candidateID) else { continue }
+            if abs(candidateFrame.origin.x - frame.origin.x) < 2,
+               abs(candidateFrame.origin.y - screenY) < 2,
+               abs(candidateFrame.width - frame.width) < 2 {
+                return candidateID
+            }
+        }
+        return nil
+    }
 }
 
 // MARK: Private Window List Helpers
