@@ -644,12 +644,12 @@ extension MenuBarItemManager {
             guard let currentTargetFrame = getCurrentFrame(for: targetItem) else {
                 throw EventError(code: .invalidItem, item: targetItem)
             }
-            return currentFrame.maxX == currentTargetFrame.minX
+            return abs(currentFrame.maxX - currentTargetFrame.minX) <= 2
         case .rightOfItem(let targetItem):
             guard let currentTargetFrame = getCurrentFrame(for: targetItem) else {
                 throw EventError(code: .invalidItem, item: targetItem)
             }
-            return currentFrame.minX == currentTargetFrame.maxX
+            return abs(currentFrame.minX - currentTargetFrame.maxX) <= 2
         }
     }
 

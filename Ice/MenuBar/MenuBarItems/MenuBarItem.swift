@@ -95,7 +95,7 @@ struct MenuBarItem {
             case "StageManager": "Stage Manager"
             case "UserSwitcher": "Fast User Switching"
             case "WiFi": "Wi-Fi"
-            default: title
+            default: Self.resolveDisplayName(from: title) ?? title
             }
         case .systemUIServer:
             switch title {
@@ -106,6 +106,18 @@ struct MenuBarItem {
         default:
             bestName
         }
+    }
+
+    /// On macOS 26+, all status items are owned by Control Center. Try to find the
+    /// actual owning app by matching the window title against running apps' bundle IDs.
+    private static func resolveDisplayName(from title: String) -> String? {
+        for app in NSWorkspace.shared.runningApplications {
+            guard let bid = app.bundleIdentifier else { continue }
+            if title.hasPrefix(bid) || title.hasPrefix(bid.replacingOccurrences(of: ".", with: "-")) {
+                return app.localizedName
+            }
+        }
+        return nil
     }
 
     /// A Boolean value that indicates whether the item is currently
