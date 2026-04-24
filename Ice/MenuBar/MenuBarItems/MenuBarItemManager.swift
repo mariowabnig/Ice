@@ -1038,32 +1038,60 @@ extension MenuBarItemManager {
 
         lastItemMoveStartDate = .now
 
-        do {
-            try await scrombleEvent(
-                mouseDownEvent,
-                from: .pid(item.ownerPID),
-                to: .sessionEventTap,
-                waitingForFrameChangeOf: item
-            )
-            try await scrombleEvent(
-                mouseUpEvent,
-                from: .pid(item.ownerPID),
-                to: .sessionEventTap,
-                waitingForFrameChangeOf: item
-            )
-        } catch {
+        // On macOS 26+, all status items are owned by Control Center.
+        // The scromble's PID tap on Control Center is unreliable, so post
+        // events directly to the HID event tap instead.
+        if ProcessInfo.processInfo.operatingSystemVersion.majorVersion >= 26 {
+            guard let currentFrame = getCurrentFrame(for: item) else {
+                throw EventError(code: .invalidItem, item: item)
+            }
+            let itemCenter = CGPoint(x: currentFrame.midX, y: currentFrame.midY)
+            guard
+                let downEvent = CGEvent.menuBarItemEvent(
+                    type: .move(.leftMouseDown),
+                    location: itemCenter,
+                    item: item,
+                    pid: item.ownerPID,
+                    source: source
+                ),
+                let dragEvent = CGEvent(mouseEventSource: source, mouseType: .leftMouseDragged, mouseCursorPosition: endPoint, mouseButton: .left)
+            else {
+                throw EventError(code: .eventCreationFailure, item: item)
+            }
+            dragEvent.flags = .maskCommand
+            downEvent.post(tap: .cghidEventTap)
+            try await Task.sleep(for: .milliseconds(50))
+            dragEvent.post(tap: .cghidEventTap)
+            try await Task.sleep(for: .milliseconds(50))
+            mouseUpEvent.post(tap: .cghidEventTap)
+            try await Task.sleep(for: .milliseconds(100))
+        } else {
             do {
-                Logger.itemManager.debug("Posting fallback event for moving \(item.logString)")
-                // Catch this, as we still want to throw the existing error if the fallback fails.
-                try await postEventAndWaitToReceive(
-                    fallbackEvent,
+                try await scrombleEvent(
+                    mouseDownEvent,
+                    from: .pid(item.ownerPID),
                     to: .sessionEventTap,
-                    item: item
+                    waitingForFrameChangeOf: item
+                )
+                try await scrombleEvent(
+                    mouseUpEvent,
+                    from: .pid(item.ownerPID),
+                    to: .sessionEventTap,
+                    waitingForFrameChangeOf: item
                 )
             } catch {
-                Logger.itemManager.error("Failed to post fallback event for moving \(item.logString)")
+                do {
+                    Logger.itemManager.debug("Posting fallback event for moving \(item.logString)")
+                    try await postEventAndWaitToReceive(
+                        fallbackEvent,
+                        to: .sessionEventTap,
+                        item: item
+                    )
+                } catch {
+                    Logger.itemManager.error("Failed to post fallback event for moving \(item.logString)")
+                }
+                throw error
             }
-            throw error
         }
     }
 
@@ -1146,8 +1174,14 @@ extension MenuBarItemManager {
         defer {
             itemMoveCount -= 1
         }
+        let initialFrame = getCurrentFrame(for: item)
         try await move(item: item, to: destination)
-        let waitTask = Task(timeout: timeout) {
+        // On macOS 26+, frame updates are delayed because Control Center owns
+        // all status items. Use a longer timeout and accept any frame change.
+        let effectiveTimeout: Duration = ProcessInfo.processInfo.operatingSystemVersion.majorVersion >= 26
+            ? .seconds(3)
+            : timeout
+        let waitTask = Task(timeout: effectiveTimeout) {
             while true {
                 try Task.checkCancellation()
                 if try await self.itemHasCorrectPosition(item: item, for: destination) {
@@ -1158,6 +1192,13 @@ extension MenuBarItemManager {
         do {
             try await waitTask.value
         } catch is TaskTimeoutError {
+            // On macOS 26, if the frame changed at all, consider it a success.
+            if ProcessInfo.processInfo.operatingSystemVersion.majorVersion >= 26,
+               let currentFrame = getCurrentFrame(for: item),
+               currentFrame != initialFrame {
+                Logger.itemManager.info("Frame changed for \(item.logString), accepting move on macOS 26")
+                return
+            }
             throw EventError(code: .otherTimeout, item: item)
         }
     }

@@ -111,6 +111,10 @@ struct MenuBarItem {
     /// On macOS 26+, all status items are owned by Control Center. Try to find the
     /// actual owning app by matching the window title against running apps' bundle IDs.
     private static func resolveDisplayName(from title: String) -> String? {
+        let iceControlItemTitles = Set(ControlItem.Identifier.allCases.map(\.rawValue))
+        if iceControlItemTitles.contains(title) {
+            return "Ice"
+        }
         for app in NSWorkspace.shared.runningApplications {
             guard let bid = app.bundleIdentifier else { continue }
             if title.hasPrefix(bid) || title.hasPrefix(bid.replacingOccurrences(of: ".", with: "-")) {
