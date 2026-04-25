@@ -39,6 +39,8 @@ What works:
 
 Ice now merges the private menu bar item list with auxiliary on-screen status-level windows whose titles start with their owning app's bundle identifier, or the dashed form of that bundle identifier. These auxiliary windows are cached as visible when they are on screen, because that matches what the user actually sees in the menu bar.
 
+When the hidden section is shown in the native menu bar, Ice also keeps enough invisible divider width reserved for these auxiliary status windows. This prevents hidden native menu bar items from sliding under an auxiliary overlay window that macOS does not manage as a normal status item.
+
 This is intentionally generic. It does not hardcode Portworth, but Portworth's stable `com.portworth.app.statusItem` window title gives Ice enough identity to show it in the Visible Section.
 
 ## How do I solve the `Ice cannot arrange menu bar items in automatically hidden menu bars` error?

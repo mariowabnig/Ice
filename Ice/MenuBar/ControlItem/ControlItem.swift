@@ -48,6 +48,10 @@ final class ControlItem {
     /// The control item's identifier.
     private let identifier: Identifier
 
+    /// Padding to leave around visible auxiliary status windows when a divider
+    /// is reserving space for them.
+    private let auxiliaryStatusItemPadding: CGFloat = 6
+
     /// Storage for internal observers.
     private var cancellables = Set<AnyCancellable>()
 
@@ -146,22 +150,12 @@ final class ControlItem {
             .store(in: &c)
 
         Publishers.CombineLatest($isVisible, $state)
-            .sink { [weak self] (isVisible, state) in
-                guard
-                    let self,
-                    let section
-                else {
+            .sink { [weak self] (isVisible, _) in
+                guard let self else {
                     return
                 }
                 if isVisible {
-                    statusItem.length = switch section.name {
-                    case .visible: Lengths.standard
-                    case .hidden, .alwaysHidden:
-                        switch state {
-                        case .hideItems: Lengths.expanded
-                        case .showItems: Lengths.standard
-                        }
-                    }
+                    updateStatusItemLength()
                     constraint?.isActive = true
                 } else {
                     statusItem.length = 0
@@ -223,10 +217,23 @@ final class ControlItem {
                     return
                 }
                 windowFrame = frame
+                updateStatusItem(with: state)
             }
             .store(in: &c)
 
         if let appState {
+            appState.itemManager.objectWillChange
+                .receive(on: DispatchQueue.main)
+                .sink { [weak self] _ in
+                    DispatchQueue.main.async {
+                        guard let self else {
+                            return
+                        }
+                        self.updateStatusItem(with: self.state)
+                    }
+                }
+                .store(in: &c)
+
             appState.settingsManager.generalSettingsManager.$showIceIcon
                 .receive(on: DispatchQueue.main)
                 .sink { [weak self] showIceIcon in
@@ -316,6 +323,59 @@ final class ControlItem {
         cancellables = c
     }
 
+    /// Returns extra length needed to keep auxiliary status windows clear when
+    /// revealing hidden items in the native menu bar.
+    private func auxiliaryStatusItemReservationLength() -> CGFloat {
+        guard
+            identifier == .hidden,
+            state == .showItems,
+            let appState,
+            let dividerFrame = windowID.flatMap(WindowInfo.init(windowID:))?.frame ?? windowFrame ?? window?.frame
+        else {
+            return 0
+        }
+
+        let auxiliaryItems = appState.itemManager.itemCache[.visible]
+            .filter { item in
+                item.isAuxiliaryStatusItem &&
+                abs(item.frame.minY - dividerFrame.minY) <= 2 &&
+                item.frame.minX < dividerFrame.maxX
+            }
+
+        guard let leftmostAuxiliaryItemMinX = auxiliaryItems.map(\.frame.minX).min() else {
+            return 0
+        }
+
+        let reservedLength = dividerFrame.maxX - leftmostAuxiliaryItemMinX + auxiliaryStatusItemPadding
+        return max(0, reservedLength - Lengths.standard)
+    }
+
+    /// Updates the status item's length based on its section state.
+    private func updateStatusItemLength() {
+        guard let section else {
+            return
+        }
+
+        statusItem.length = switch section.name {
+        case .visible:
+            Lengths.standard
+        case .hidden:
+            switch state {
+            case .hideItems:
+                Lengths.expanded
+            case .showItems:
+                Lengths.standard + auxiliaryStatusItemReservationLength()
+            }
+        case .alwaysHidden:
+            switch state {
+            case .hideItems:
+                Lengths.expanded
+            case .showItems:
+                Lengths.standard
+            }
+        }
+    }
+
     /// Sets the initial configuration for the status item.
     private func configureStatusItem() {
         defer {
@@ -371,17 +431,24 @@ final class ControlItem {
                 button.isHighlighted = false
                 button.image = nil
             case .showItems:
-                isVisible = appState.settingsManager.advancedSettingsManager.showSectionDividers
+                let showSectionDividers = appState.settingsManager.advancedSettingsManager.showSectionDividers
+                let shouldReserveAuxiliaryItemSpace = section.name == .hidden && auxiliaryStatusItemReservationLength() > 0
+                isVisible = showSectionDividers || shouldReserveAuxiliaryItemSpace
                 // Enable the cell, as it may have been previously disabled.
                 button.cell?.isEnabled = true
                 // Set the image based on the section name and the hiding state.
-                switch section.name {
-                case .hidden:
-                    button.image = ControlItemImage.builtin(.chevronLarge).nsImage(for: appState)
-                case .alwaysHidden:
-                    button.image = ControlItemImage.builtin(.chevronSmall).nsImage(for: appState)
-                case .visible: break
+                if showSectionDividers {
+                    switch section.name {
+                    case .hidden:
+                        button.image = ControlItemImage.builtin(.chevronLarge).nsImage(for: appState)
+                    case .alwaysHidden:
+                        button.image = ControlItemImage.builtin(.chevronSmall).nsImage(for: appState)
+                    case .visible: break
+                    }
+                } else {
+                    button.image = nil
                 }
+                updateStatusItemLength()
             }
         }
     }
