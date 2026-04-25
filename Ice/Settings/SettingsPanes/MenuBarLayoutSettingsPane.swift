@@ -82,7 +82,7 @@ struct MenuBarLayoutSettingsPane: View {
                     .font(.system(size: 14))
                     .padding(.leading, 2)
 
-                LayoutBar(section: section)
+                LayoutBar(section: section, usesLiveMenuBarBackground: false)
                     .environmentObject(appState.imageCache)
             }
         }

@@ -25,6 +25,7 @@ struct LayoutBar: View {
 
     let section: MenuBarSection
     let spacing: CGFloat
+    let usesLiveMenuBarBackground: Bool
 
     private var menuBarManager: MenuBarManager {
         appState.menuBarManager
@@ -34,16 +35,20 @@ struct LayoutBar: View {
         RoundedRectangle(cornerRadius: 9, style: .circular)
     }
 
-    init(section: MenuBarSection, spacing: CGFloat = 0) {
+    init(section: MenuBarSection, spacing: CGFloat = 0, usesLiveMenuBarBackground: Bool = true) {
         self.section = section
         self.spacing = spacing
+        self.usesLiveMenuBarBackground = usesLiveMenuBarBackground
     }
 
     var body: some View {
         conditionalBody
             .frame(height: 50)
             .frame(maxWidth: .infinity)
-            .layoutBarStyle(appState: appState, averageColorInfo: menuBarManager.averageColorInfo)
+            .layoutBarStyle(
+                appState: appState,
+                averageColorInfo: usesLiveMenuBarBackground ? menuBarManager.averageColorInfo : nil
+            )
             .clipShape(backgroundShape)
             .overlay {
                 backgroundShape

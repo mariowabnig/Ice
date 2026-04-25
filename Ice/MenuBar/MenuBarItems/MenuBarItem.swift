@@ -131,6 +131,23 @@ struct MenuBarItem {
         return list.contains(windowID)
     }
 
+    /// A Boolean value that indicates whether the item is a visible status-level
+    /// window that is not returned by the private menu bar item list.
+    var isAuxiliaryStatusItem: Bool {
+        guard
+            isOnScreen,
+            !isCurrentlyInMenuBar,
+            let title,
+            !title.isEmpty,
+            let bundleIdentifier = owningApplication?.bundleIdentifier
+        else {
+            return false
+        }
+
+        let dashedBundleIdentifier = bundleIdentifier.replacingOccurrences(of: ".", with: "-")
+        return title.hasPrefix(bundleIdentifier) || title.hasPrefix(dashedBundleIdentifier)
+    }
+
     /// A string to use for logging purposes.
     var logString: String {
         String(describing: info)
@@ -178,6 +195,61 @@ struct MenuBarItem {
 
 // MARK: MenuBarItem Getters
 extension MenuBarItem {
+    private static func isAuxiliaryStatusItemWindow(
+        _ window: WindowInfo,
+        on display: CGDirectDisplayID?,
+        activeSpaceOnly: Bool,
+        excluding excludedWindowIDs: Set<CGWindowID>
+    ) -> Bool {
+        guard
+            !excludedWindowIDs.contains(window.windowID),
+            window.isMenuBarItem,
+            window.isOnScreen,
+            window.alpha > 0,
+            let title = window.title,
+            !title.isEmpty,
+            let bundleIdentifier = window.owningApplication?.bundleIdentifier
+        else {
+            return false
+        }
+
+        let dashedBundleIdentifier = bundleIdentifier.replacingOccurrences(of: ".", with: "-")
+        guard title.hasPrefix(bundleIdentifier) || title.hasPrefix(dashedBundleIdentifier) else {
+            return false
+        }
+
+        if activeSpaceOnly, !window.isOnActiveSpace {
+            return false
+        }
+
+        let displayBounds = display.map { [CGDisplayBounds($0)] } ?? NSScreen.screens.map { CGDisplayBounds($0.displayID) }
+        guard displayBounds.contains(where: { bounds in
+            abs(window.frame.minY - bounds.minY) <= 2 &&
+            bounds.intersects(window.frame)
+        }) else {
+            return false
+        }
+
+        return window.frame.height <= NSStatusBar.system.thickness + 10
+    }
+
+    private static func getAuxiliaryStatusItems(
+        on display: CGDirectDisplayID?,
+        activeSpaceOnly: Bool,
+        excluding excludedWindowIDs: Set<CGWindowID>
+    ) -> [MenuBarItem] {
+        WindowInfo.getOnScreenWindows(excludeDesktopWindows: true)
+            .filter {
+                isAuxiliaryStatusItemWindow(
+                    $0,
+                    on: display,
+                    activeSpaceOnly: activeSpaceOnly,
+                    excluding: excludedWindowIDs
+                )
+            }
+            .compactMap(MenuBarItem.init(itemWindow:))
+    }
+
     /// Returns an array of the current menu bar items in the menu bar on the given display.
     ///
     /// - Parameters:
@@ -210,11 +282,19 @@ extension MenuBarItem {
             }
         }
 
-        return Bridging.getWindowList(option: option).lazy
+        let bridgedWindowIDs = Bridging.getWindowList(option: option)
+        let bridgedItems = bridgedWindowIDs.lazy
             .filter(boundsPredicate)
             .compactMap { windowID in
                 MenuBarItem(windowID: windowID)
             }
+        let auxiliaryItems = getAuxiliaryStatusItems(
+            on: display,
+            activeSpaceOnly: activeSpaceOnly,
+            excluding: Set(bridgedWindowIDs)
+        )
+
+        return (Array(bridgedItems) + auxiliaryItems)
             .filter(titlePredicate)
             .sortedByOrderInMenuBar()
     }

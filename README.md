@@ -47,6 +47,7 @@ brew install --cask jordanbaird-ice
 - [x] Automatically rehide menu bar items
 - [x] Hide application menus when they overlap with shown menu bar items
 - [x] Drag and drop interface to arrange individual menu bar items
+- [x] Discover visible auxiliary status-level items that are not returned by macOS's private menu bar item list
 - [x] Display hidden menu bar items in a separate bar (e.g. for MacBooks with the notch)
 - [x] Search menu bar items
 - [x] Menu bar item spacing (BETA)

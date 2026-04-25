@@ -261,6 +261,8 @@ extension MenuBarItemManager {
                 // items are cached, use the return destinations to insert the items into the cache
                 // at the correct position.
                 tempShownItems.append((item, context.returnDestination))
+            } else if item.isAuxiliaryStatusItem {
+                cache[.visible].append(item)
             } else if predicates.isInVisibleSection(item) {
                 cache[.visible].append(item)
             } else if predicates.isInHiddenSection(item) {
@@ -325,15 +327,15 @@ extension MenuBarItemManager {
             }
         }
 
-        let itemWindowIDs = Bridging.getWindowList(option: [.menuBarItems, .activeSpace])
+        var items = MenuBarItem.getMenuBarItems(onScreenOnly: false, activeSpaceOnly: true)
+
+        let itemWindowIDs = items.map(\.windowID)
         if cachedItemWindowIDs == itemWindowIDs {
             logSkippingCache(reason: "item windows have not changed")
             return
         } else {
             cachedItemWindowIDs = itemWindowIDs
         }
-
-        var items = MenuBarItem.getMenuBarItems(onScreenOnly: false, activeSpaceOnly: true)
 
         let hiddenControlItem = items.firstIndex(matching: .hiddenControlItem).map { items.remove(at: $0) }
         let alwaysHiddenControlItem = items.firstIndex(matching: .alwaysHiddenControlItem).map { items.remove(at: $0) }

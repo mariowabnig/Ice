@@ -3,6 +3,7 @@
 - [Items are moved to the always-hidden section](#items-are-moved-to-the-always-hidden-section)
 - [Ice removed an item](#ice-removed-an-item)
 - [Ice does not remember the order of items](#ice-does-not-remember-the-order-of-items)
+- [A visible app is missing from the Menu Bar Layout view](#a-visible-app-is-missing-from-the-menu-bar-layout-view)
 - [How do I solve the `Ice cannot arrange menu bar items in automatically hidden menu bars` error?](#how-do-i-solve-the-ice-cannot-arrange-menu-bar-items-in-automatically-hidden-menu-bars-error)
 
 ## Items are moved to the always-hidden section
@@ -23,6 +24,22 @@ the always-hidden section, then Command + drag the item into a different section
 ## Ice does not remember the order of items
 
 This is not a bug, but a missing feature. It is being tracked in [#26](https://github.com/jordanbaird/Ice/issues/26).
+
+## A visible app is missing from the Menu Bar Layout view
+
+Some menu bar apps use a status-level overlay window when their native status item exists but is not visibly placed by macOS. Portworth is one example: it can show a portfolio title and sparkline in a Portworth-owned status-level window titled `com.portworth.app.statusItem`.
+
+What failed:
+
+1. Looking only at macOS's private menu bar item list missed these overlay-backed items.
+2. Classifying sections only by Ice's divider item positions could place a real on-screen overlay into the wrong section when the overlay appeared left of the usual status cluster.
+3. Letting the overlay app detect its own window as a native item caused brief hide/show flicker after wake or unlock.
+
+What works:
+
+Ice now merges the private menu bar item list with auxiliary on-screen status-level windows whose titles start with their owning app's bundle identifier, or the dashed form of that bundle identifier. These auxiliary windows are cached as visible when they are on screen, because that matches what the user actually sees in the menu bar.
+
+This is intentionally generic. It does not hardcode Portworth, but Portworth's stable `com.portworth.app.statusItem` window title gives Ice enough identity to show it in the Visible Section.
 
 ## How do I solve the `Ice cannot arrange menu bar items in automatically hidden menu bars` error?
 
