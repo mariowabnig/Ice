@@ -94,28 +94,6 @@ final class MenuBarItemManager: ObservableObject {
         }
     }
 
-    /// A lightweight signature used to determine whether item cache input changed.
-    private struct ItemWindowSignature: Equatable {
-        /// The identifier of the item's window.
-        let windowID: CGWindowID
-
-        /// The frame of the item's window.
-        let frame: CGRect
-
-        /// The title of the item's window.
-        let title: String?
-
-        /// A Boolean value that indicates whether the item is on screen.
-        let isOnScreen: Bool
-
-        init(item: MenuBarItem) {
-            self.windowID = item.windowID
-            self.frame = item.frame
-            self.title = item.title
-            self.isOnScreen = item.isOnScreen
-        }
-    }
-
     /// The manager's menu bar item cache.
     @Published private(set) var itemCache = ItemCache()
 
@@ -125,8 +103,8 @@ final class MenuBarItemManager: ObservableObject {
     /// Storage for internal observers.
     private var cancellables = Set<AnyCancellable>()
 
-    /// Cached window signatures for the most recent items.
-    private var cachedItemWindowSignatures = [ItemWindowSignature]()
+    /// Cached window identifiers for the most recent items.
+    private var cachedItemWindowIDs = [CGWindowID]()
 
     /// Context values for the current temporarily shown items.
     private var tempShownItemContexts = [TempShownItemContext]()
@@ -351,12 +329,12 @@ extension MenuBarItemManager {
 
         var items = MenuBarItem.getMenuBarItems(onScreenOnly: false, activeSpaceOnly: true)
 
-        let itemWindowSignatures = items.map(ItemWindowSignature.init)
-        if cachedItemWindowSignatures == itemWindowSignatures {
+        let itemWindowIDs = items.map(\.windowID)
+        if cachedItemWindowIDs == itemWindowIDs {
             logSkippingCache(reason: "item windows have not changed")
             return
         } else {
-            cachedItemWindowSignatures = itemWindowSignatures
+            cachedItemWindowIDs = itemWindowIDs
         }
 
         let hiddenControlItem = items.firstIndex(matching: .hiddenControlItem).map { items.remove(at: $0) }
