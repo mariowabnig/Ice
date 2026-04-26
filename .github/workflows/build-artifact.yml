@@ -1,0 +1,36 @@
+name: Build Ice Artifact
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build app
+    runs-on: macos-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Build Ice
+        run: |
+          xcodebuild -project Ice.xcodeproj -scheme Ice -configuration Release \
+            -derivedDataPath build \
+            CODE_SIGN_IDENTITY="-" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=YES DEVELOPMENT_TEAM="" \
+            DEBUG_INFORMATION_FORMAT=dwarf \
+            build
+
+      - name: Sign app bundle
+        run: |
+          codesign --force --sign - --timestamp=none build/Build/Products/Release/Ice.app/Contents/Frameworks/Sparkle.framework
+          codesign --force --sign - --timestamp=none build/Build/Products/Release/Ice.app
+
+      - name: Package app
+        run: |
+          ditto -c -k --keepParent build/Build/Products/Release/Ice.app Ice.app.zip
+
+      - name: Upload app
+        uses: actions/upload-artifact@v4
+        with:
+          name: Ice-app
+          path: Ice.app.zip
+          if-no-files-found: error
