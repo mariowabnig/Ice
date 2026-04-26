@@ -37,6 +37,9 @@ final class MenuBarManager: ObservableObject {
     /// Panels that cover auxiliary status item windows while the system menu bar is hidden.
     private var auxiliaryStatusItemCoverPanels = [CGWindowID: NSPanel]()
 
+    /// The last visible/hidden state applied to auxiliary status item cover panels.
+    private var auxiliaryStatusItemCoversAreVisible = false
+
     /// The panel that contains the Ice Bar interface.
     let iceBarPanel: IceBarPanel
 
@@ -103,6 +106,7 @@ final class MenuBarManager: ObservableObject {
                 }
                 let hidden = options.contains(.hideMenuBar) || options.contains(.autoHideMenuBar)
                 isMenuBarHiddenBySystem = hidden
+                updateAuxiliaryStatusItemCovers()
             }
             .store(in: &c)
 
@@ -130,6 +134,13 @@ final class MenuBarManager: ObservableObject {
             let hiddenSection = section(withName: .hidden),
             let window = hiddenSection.controlItem.window
         {
+            window.publisher(for: \.frame)
+                .receive(on: DispatchQueue.main)
+                .sink { [weak self] _ in
+                    self?.updateAuxiliaryStatusItemCovers()
+                }
+                .store(in: &c)
+
             window.publisher(for: \.frame)
                 .debounce(for: 0.1, scheduler: DispatchQueue.main)
                 .sink { [weak self, weak window] _ in
@@ -284,6 +295,15 @@ final class MenuBarManager: ObservableObject {
         }
     }
 
+    /// Returns a Boolean value that indicates whether auxiliary status item
+    /// windows should currently be covered.
+    private func shouldCoverAuxiliaryStatusItems(appState: AppState) -> Bool {
+        guard isMenuBarConfiguredToAutoHide else {
+            return false
+        }
+        return !appState.eventManager.isMouseInsideMenuBar
+    }
+
     /// Updates the cover panels that hide app-owned auxiliary status item windows
     /// while macOS has retracted an automatically hidden menu bar.
     private func updateAuxiliaryStatusItemCovers() {
@@ -295,7 +315,7 @@ final class MenuBarManager: ObservableObject {
             return
         }
 
-        let shouldCoverItems = !appState.eventManager.isMouseInsideMenuBar
+        let shouldCoverItems = shouldCoverAuxiliaryStatusItems(appState: appState)
 
         let items = MenuBarItem.getMenuBarItems(onScreenOnly: true, activeSpaceOnly: true)
             .filter(\.isAuxiliaryStatusItem)
@@ -317,26 +337,38 @@ final class MenuBarManager: ObservableObject {
                 continue
             }
             let panel = auxiliaryStatusItemCoverPanels[item.windowID] ?? createAuxiliaryStatusItemCoverPanel()
-            panel.setFrame(frame, display: true)
-            panel.alphaValue = shouldCoverItems ? 1 : 0
+
+            if shouldCoverItems {
+                if
+                    let image = ScreenCapture.captureScreenBelowWindow(
+                        item.windowID,
+                        screenBounds: coverFrame,
+                        option: [.boundsIgnoreFraming, .bestResolution]
+                    ),
+                    let imageView = panel.contentView as? NSImageView
+                {
+                    imageView.image = NSImage(cgImage: image, size: frame.size)
+                } else if (panel.contentView as? NSImageView)?.image == nil {
+                    continue
+                }
+            }
+
+            NSAnimationContext.runAnimationGroup { context in
+                context.duration = 0
+                context.allowsImplicitAnimation = false
+                panel.setFrame(frame, display: true)
+                panel.alphaValue = shouldCoverItems ? 1 : 0
+            }
+
             if shouldCoverItems {
                 panel.orderFrontRegardless()
-            }
-            if
-                let image = ScreenCapture.captureScreenBelowWindow(
-                    item.windowID,
-                    screenBounds: coverFrame,
-                    option: [.boundsIgnoreFraming, .bestResolution]
-                ),
-                let imageView = panel.contentView as? NSImageView
-            {
-                imageView.image = NSImage(cgImage: image, size: frame.size)
-            }
-            if shouldCoverItems {
-                panel.orderFrontRegardless()
+            } else if auxiliaryStatusItemCoversAreVisible {
+                panel.orderOut(nil)
             }
             auxiliaryStatusItemCoverPanels[item.windowID] = panel
         }
+
+        auxiliaryStatusItemCoversAreVisible = shouldCoverItems
     }
 
     /// Closes all cover panels for app-owned auxiliary status item windows.
@@ -345,6 +377,7 @@ final class MenuBarManager: ObservableObject {
             panel.close()
         }
         auxiliaryStatusItemCoverPanels.removeAll()
+        auxiliaryStatusItemCoversAreVisible = false
     }
 
     /// Creates a panel that visually covers an auxiliary status item window.

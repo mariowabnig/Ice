@@ -41,6 +41,8 @@ What works:
 
 Ice now merges the private menu bar item list with auxiliary on-screen status-level windows whose titles start with their owning app's bundle identifier, or the dashed form of that bundle identifier. These auxiliary windows are cached as visible when they are on screen, because that matches what the user actually sees in the menu bar.
 
+Ice treats auxiliary item frame changes as cache changes too. This is important for apps whose status-level windows move, resize, or change visibility without getting a new window identifier.
+
 When the hidden section is shown in the native menu bar, Ice also keeps enough invisible divider width reserved for these auxiliary status windows. This prevents hidden native menu bar items from sliding under an auxiliary overlay window that macOS does not manage as a normal status item.
 
 This is intentionally generic. It does not hardcode Portworth, but Portworth's stable `com.portworth.app.statusItem` window title gives Ice enough identity to show it in the Visible Section.
@@ -49,7 +51,7 @@ This is intentionally generic. It does not hardcode Portworth, but Portworth's s
 
 Some apps draw their own status-level window in the menu bar. Portworth is one example. These windows are owned by the app, not by Ice or the macOS menu bar, so Ice cannot move or hide them the same way it moves native status items.
 
-When the macOS menu bar is configured to automatically hide and show, Ice handles these auxiliary status-level windows by placing a transparent cover window over each auxiliary item. The cover stays invisible while the menu bar is shown, tracks the auxiliary item's current position, and becomes visible as soon as the menu bar retracts. This keeps auxiliary items from lingering on the desktop after the rest of the menu bar has disappeared.
+When the macOS menu bar is configured to automatically hide and show, Ice handles these auxiliary status-level windows by placing a transparent cover window over each auxiliary item. The cover stays invisible while the menu bar is shown, tracks the auxiliary item's current position, and becomes visible as soon as the pointer leaves the menu bar. Updating the cover during the hide transition avoids a delayed mask and reduces flicker as the system menu bar retracts.
 
 This cover is visual only. The app that owns the auxiliary window still owns its window and may update or animate it independently.
 
