@@ -45,6 +45,8 @@ Ice treats auxiliary item frame changes as cache changes too. This is important 
 
 When the hidden section is shown in the native menu bar, Ice also keeps enough invisible divider width reserved for these auxiliary status windows. The reservation uses the auxiliary window frames captured while the hidden section is hidden, so newly shown native items are added to the left without pushing the auxiliary window around. This prevents hidden native menu bar items from sliding under an auxiliary overlay window that macOS does not manage as a normal status item.
 
+Implementation note: Ice's hide/show control is driven by both the control item's published hiding state and the spacer length applied to the status item. When updating this flow, make length and auxiliary reservation calculations use the state value currently being applied, because reading the stored state during a publisher callback can be stale and can leave hidden items visible after the user clicks Hide.
+
 This is intentionally generic. It does not hardcode Portworth, but Portworth's stable `com.portworth.app.statusItem` window title gives Ice enough identity to show it in the Visible Section.
 
 ## A visible app remains onscreen when the menu bar auto-hides

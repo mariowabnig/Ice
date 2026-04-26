@@ -153,12 +153,12 @@ final class ControlItem {
             .store(in: &c)
 
         Publishers.CombineLatest($isVisible, $state)
-            .sink { [weak self] (isVisible, _) in
+            .sink { [weak self] (isVisible, state) in
                 guard let self else {
                     return
                 }
                 if isVisible {
-                    updateStatusItemLength()
+                    updateStatusItemLength(for: state)
                     constraint?.isActive = true
                 } else {
                     statusItem.length = 0
@@ -231,7 +231,7 @@ final class ControlItem {
                     guard let self else {
                         return
                     }
-                    updateAuxiliaryStatusItemReservationFrames(from: cache[.visible])
+                    updateAuxiliaryStatusItemReservationFrames(from: cache[.visible], for: state)
                     updateStatusItem(with: state)
                 }
                 .store(in: &c)
@@ -326,10 +326,10 @@ final class ControlItem {
     }
 
     /// Updates auxiliary status item frame anchors while the hidden section is hidden.
-    private func updateAuxiliaryStatusItemReservationFrames(from items: [MenuBarItem]) {
+    private func updateAuxiliaryStatusItemReservationFrames(from items: [MenuBarItem], for state: HidingState? = nil) {
         guard
             identifier == .hidden,
-            state == .hideItems
+            (state ?? self.state) == .hideItems
         else {
             return
         }
@@ -343,10 +343,10 @@ final class ControlItem {
 
     /// Returns extra length needed to keep auxiliary status windows clear when
     /// revealing hidden items in the native menu bar.
-    private func auxiliaryStatusItemReservationLength() -> CGFloat {
+    private func auxiliaryStatusItemReservationLength(for state: HidingState? = nil) -> CGFloat {
         guard
             identifier == .hidden,
-            state == .showItems,
+            (state ?? self.state) == .showItems,
             let appState,
             let dividerFrame = windowID.flatMap(WindowInfo.init(windowID:))?.frame ?? windowFrame ?? window?.frame
         else {
@@ -377,10 +377,12 @@ final class ControlItem {
     }
 
     /// Updates the status item's length based on its section state.
-    private func updateStatusItemLength() {
+    private func updateStatusItemLength(for state: HidingState? = nil) {
         guard let section else {
             return
         }
+
+        let state = state ?? self.state
 
         statusItem.length = switch section.name {
         case .visible:
@@ -390,7 +392,7 @@ final class ControlItem {
             case .hideItems:
                 Lengths.expanded
             case .showItems:
-                Lengths.standard + auxiliaryStatusItemReservationLength()
+                Lengths.standard + auxiliaryStatusItemReservationLength(for: state)
             }
         case .alwaysHidden:
             switch state {
@@ -450,7 +452,7 @@ final class ControlItem {
         case .hidden, .alwaysHidden:
             switch state {
             case .hideItems:
-                updateAuxiliaryStatusItemReservationFrames(from: appState.itemManager.itemCache[.visible])
+                updateAuxiliaryStatusItemReservationFrames(from: appState.itemManager.itemCache[.visible], for: state)
                 isVisible = true
                 // Prevent the cell from highlighting while expanded.
                 button.cell?.isEnabled = false
@@ -459,7 +461,7 @@ final class ControlItem {
                 button.image = nil
             case .showItems:
                 let showSectionDividers = appState.settingsManager.advancedSettingsManager.showSectionDividers
-                let shouldReserveAuxiliaryItemSpace = section.name == .hidden && auxiliaryStatusItemReservationLength() > 0
+                let shouldReserveAuxiliaryItemSpace = section.name == .hidden && auxiliaryStatusItemReservationLength(for: state) > 0
                 isVisible = showSectionDividers || shouldReserveAuxiliaryItemSpace
                 // Enable the cell, as it may have been previously disabled.
                 button.cell?.isEnabled = true
@@ -475,7 +477,7 @@ final class ControlItem {
                 } else {
                     button.image = nil
                 }
-                updateStatusItemLength()
+                updateStatusItemLength(for: state)
             }
         }
     }
