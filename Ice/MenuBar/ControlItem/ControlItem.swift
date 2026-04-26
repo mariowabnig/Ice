@@ -52,6 +52,9 @@ final class ControlItem {
     /// is reserving space for them.
     private let auxiliaryStatusItemPadding: CGFloat = 6
 
+    /// Auxiliary status item frames captured while the hidden section is hidden.
+    private var auxiliaryStatusItemReservationFrames = [MenuBarItemInfo: CGRect]()
+
     /// Storage for internal observers.
     private var cancellables = Set<AnyCancellable>()
 
@@ -222,15 +225,14 @@ final class ControlItem {
             .store(in: &c)
 
         if let appState {
-            appState.itemManager.objectWillChange
+            appState.itemManager.$itemCache
                 .receive(on: DispatchQueue.main)
-                .sink { [weak self] _ in
-                    DispatchQueue.main.async {
-                        guard let self else {
-                            return
-                        }
-                        self.updateStatusItem(with: self.state)
+                .sink { [weak self] cache in
+                    guard let self else {
+                        return
                     }
+                    updateAuxiliaryStatusItemReservationFrames(from: cache[.visible])
+                    updateStatusItem(with: state)
                 }
                 .store(in: &c)
 
@@ -323,6 +325,22 @@ final class ControlItem {
         cancellables = c
     }
 
+    /// Updates auxiliary status item frame anchors while the hidden section is hidden.
+    private func updateAuxiliaryStatusItemReservationFrames(from items: [MenuBarItem]) {
+        guard
+            identifier == .hidden,
+            state == .hideItems
+        else {
+            return
+        }
+
+        auxiliaryStatusItemReservationFrames = items.reduce(into: [:]) { frames, item in
+            if item.isAuxiliaryStatusItem {
+                frames[item.info] = item.frame
+            }
+        }
+    }
+
     /// Returns extra length needed to keep auxiliary status windows clear when
     /// revealing hidden items in the native menu bar.
     private func auxiliaryStatusItemReservationLength() -> CGFloat {
@@ -335,14 +353,22 @@ final class ControlItem {
             return 0
         }
 
-        let auxiliaryItems = appState.itemManager.itemCache[.visible]
-            .filter { item in
-                item.isAuxiliaryStatusItem &&
-                abs(item.frame.minY - dividerFrame.minY) <= 2 &&
-                item.frame.minX < dividerFrame.maxX
-            }
+        let auxiliaryFrames = if auxiliaryStatusItemReservationFrames.isEmpty {
+            appState.itemManager.itemCache[.visible]
+                .filter(\.isAuxiliaryStatusItem)
+                .map(\.frame)
+        } else {
+            Array(auxiliaryStatusItemReservationFrames.values)
+        }
 
-        guard let leftmostAuxiliaryItemMinX = auxiliaryItems.map(\.frame.minX).min() else {
+        guard let leftmostAuxiliaryItemMinX = auxiliaryFrames
+            .filter({
+                abs($0.minY - dividerFrame.minY) <= 2 &&
+                $0.minX < dividerFrame.maxX
+            })
+            .map(\.minX)
+            .min()
+        else {
             return 0
         }
 
@@ -424,6 +450,7 @@ final class ControlItem {
         case .hidden, .alwaysHidden:
             switch state {
             case .hideItems:
+                updateAuxiliaryStatusItemReservationFrames(from: appState.itemManager.itemCache[.visible])
                 isVisible = true
                 // Prevent the cell from highlighting while expanded.
                 button.cell?.isEnabled = false
