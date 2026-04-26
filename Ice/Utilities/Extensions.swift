@@ -458,6 +458,34 @@ extension NSScreen {
         let menuBarWindow = WindowInfo.getMenuBarWindow(for: displayID)
         return menuBarWindow?.frame.height
     }
+
+    /// A best-effort AppKit-coordinate frame for the menu bar, including the
+    /// reveal strip used when the system auto-hides the menu bar.
+    var appKitMenuBarFrame: CGRect {
+        let height = getMenuBarHeight() ?? NSStatusBar.system.thickness
+        let lowerBound = if visibleFrame.maxY < frame.maxY {
+            visibleFrame.maxY
+        } else {
+            frame.maxY - height
+        }
+        return CGRect(
+            x: frame.minX,
+            y: lowerBound,
+            width: frame.width,
+            height: frame.maxY - lowerBound
+        )
+    }
+
+    /// Returns whether the given AppKit-coordinate point is inside the menu bar
+    /// area, even when the system is only showing its top-edge reveal strip.
+    func containsAppKitMenuBarPoint(_ point: CGPoint) -> Bool {
+        let menuBarFrame = appKitMenuBarFrame
+        return
+            point.x >= menuBarFrame.minX &&
+            point.x <= menuBarFrame.maxX &&
+            point.y >= menuBarFrame.minY &&
+            point.y <= menuBarFrame.maxY
+    }
 }
 
 // MARK: - NSStatusItem

@@ -45,6 +45,8 @@ This is intentionally generic. It does not hardcode Portworth, but Portworth's s
 
 ## How do I solve the `Ice cannot arrange menu bar items in automatically hidden menu bars` error?
 
+Showing and rehiding hidden items is supported when the macOS menu bar is set to automatically hide and show. Arranging menu bar items still requires the menu bar to be permanently visible while you make layout changes:
+
 1. Open `System Settings` on your Mac
 2. Go to `Control Center`
 3. Select `Never` as shown in the image below

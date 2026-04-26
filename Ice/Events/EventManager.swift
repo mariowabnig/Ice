@@ -459,8 +459,11 @@ extension EventManager {
             {
                 return menuBarWindow.frame.contains(mouseLocation)
             }
+            if let mouseLocation = MouseCursor.locationAppKit {
+                return screen.containsAppKitMenuBarPoint(mouseLocation)
+            }
         } else if let mouseLocation = MouseCursor.locationAppKit {
-            return mouseLocation.y > screen.visibleFrame.maxY && mouseLocation.y <= screen.frame.maxY
+            return screen.containsAppKitMenuBarPoint(mouseLocation)
         }
         return false
     }

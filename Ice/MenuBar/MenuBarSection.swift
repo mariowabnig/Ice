@@ -258,7 +258,7 @@ final class MenuBarSection {
             else {
                 return event
             }
-            if NSEvent.mouseLocation.y < screen.visibleFrame.maxY {
+            if !screen.containsAppKitMenuBarPoint(NSEvent.mouseLocation) {
                 if rehideTimer == nil {
                     rehideTimer = .scheduledTimer(
                         withTimeInterval: appState.settingsManager.generalSettingsManager.rehideInterval,
@@ -270,7 +270,7 @@ final class MenuBarSection {
                         else {
                             return
                         }
-                        if NSEvent.mouseLocation.y < screen.visibleFrame.maxY {
+                        if !screen.containsAppKitMenuBarPoint(NSEvent.mouseLocation) {
                             Task {
                                 await self.hide()
                             }

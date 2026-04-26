@@ -44,6 +44,7 @@ brew install --cask jordanbaird-ice
 - [x] Show hidden menu bar items when hovering over the menu bar
 - [x] Show hidden menu bar items when an empty area in the menu bar is clicked
 - [x] Show hidden menu bar items by scrolling or swiping in the menu bar
+- [x] Show hidden menu bar items when the macOS menu bar is automatically hidden
 - [x] Automatically rehide menu bar items
 - [x] Hide application menus when they overlap with shown menu bar items
 - [x] Drag and drop interface to arrange individual menu bar items
