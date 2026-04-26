@@ -4,7 +4,9 @@
 - [Ice removed an item](#ice-removed-an-item)
 - [Ice does not remember the order of items](#ice-does-not-remember-the-order-of-items)
 - [A visible app is missing from the Menu Bar Layout view](#a-visible-app-is-missing-from-the-menu-bar-layout-view)
+- [A visible app remains onscreen when the menu bar auto-hides](#a-visible-app-remains-onscreen-when-the-menu-bar-auto-hides)
 - [How do I solve the `Ice cannot arrange menu bar items in automatically hidden menu bars` error?](#how-do-i-solve-the-ice-cannot-arrange-menu-bar-items-in-automatically-hidden-menu-bars-error)
+- [Why do local installs keep asking for Accessibility or Screen Recording permission?](#why-do-local-installs-keep-asking-for-accessibility-or-screen-recording-permission)
 
 ## Items are moved to the always-hidden section
 
@@ -43,6 +45,14 @@ When the hidden section is shown in the native menu bar, Ice also keeps enough i
 
 This is intentionally generic. It does not hardcode Portworth, but Portworth's stable `com.portworth.app.statusItem` window title gives Ice enough identity to show it in the Visible Section.
 
+## A visible app remains onscreen when the menu bar auto-hides
+
+Some apps draw their own status-level window in the menu bar. Portworth is one example. These windows are owned by the app, not by Ice or the macOS menu bar, so Ice cannot move or hide them the same way it moves native status items.
+
+When the macOS menu bar is configured to automatically hide and show, Ice handles these auxiliary status-level windows by placing a transparent cover window over each auxiliary item. The cover stays invisible while the menu bar is shown, tracks the auxiliary item's current position, and becomes visible as soon as the menu bar retracts. This keeps auxiliary items from lingering on the desktop after the rest of the menu bar has disappeared.
+
+This cover is visual only. The app that owns the auxiliary window still owns its window and may update or animate it independently.
+
 ## How do I solve the `Ice cannot arrange menu bar items in automatically hidden menu bars` error?
 
 Showing and rehiding hidden items is supported when the macOS menu bar is set to automatically hide and show. Arranging menu bar items still requires the menu bar to be permanently visible while you make layout changes:
@@ -54,3 +64,11 @@ Showing and rehiding hidden items is supported when the macOS menu bar is set to
 5. Return `Automatically hide and show the menu bar` to your preferred settings
 
 ![Disable Menu Bar Hiding](https://github.com/user-attachments/assets/74c1fde6-d310-4fe3-9f2b-703d8ccb636a)
+
+## Why do local installs keep asking for Accessibility or Screen Recording permission?
+
+macOS stores Accessibility and Screen Recording grants against the installed app's identity. Local development builds are ad-hoc signed, so macOS can still occasionally treat a rebuilt app as a new app, especially after changing signing, bundle contents, or the installed app path.
+
+The `build-and-install.sh` helper preserves existing TCC permissions. It no longer calls `tccutil reset` for Accessibility or Screen Recording during install, and it signs the embedded Sparkle framework and Ice app separately before launching the new build.
+
+If macOS still does not apply an existing grant to a local ad-hoc build, remove Ice from `System Settings` > `Privacy & Security` > `Accessibility`, add `/Applications/Ice.app` again, and relaunch Ice. Stable Developer ID signing is the long-term way to avoid most rebuild identity churn.

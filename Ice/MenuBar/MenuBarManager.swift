@@ -121,6 +121,7 @@ final class MenuBarManager: ObservableObject {
                         return
                     }
                     updateIsMenuBarHiddenBySystemUserDefaults()
+                    updateAuxiliaryStatusItemCovers()
                 }
                 .store(in: &c)
         }
@@ -144,6 +145,7 @@ final class MenuBarManager: ObservableObject {
                     for section in sections {
                         section.hide()
                     }
+                    updateAuxiliaryStatusItemCovers()
                 }
                 .store(in: &c)
         }
@@ -181,7 +183,14 @@ final class MenuBarManager: ObservableObject {
             }
             .store(in: &c)
 
-        Timer.publish(every: 0.2, on: .main, in: .default)
+        UniversalEventMonitor.publisher(for: [.mouseMoved, .leftMouseDragged, .rightMouseDragged])
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.updateAuxiliaryStatusItemCovers()
+            }
+            .store(in: &c)
+
+        Timer.publish(every: 1, on: .main, in: .default)
             .autoconnect()
             .sink { [weak self] _ in
                 self?.updateIsMenuBarHiddenBySystemUserDefaults()
@@ -280,12 +289,13 @@ final class MenuBarManager: ObservableObject {
     private func updateAuxiliaryStatusItemCovers() {
         guard
             let appState,
-            isMenuBarConfiguredToAutoHide,
-            !appState.eventManager.isMouseInsideMenuBar
+            isMenuBarConfiguredToAutoHide
         else {
             closeAuxiliaryStatusItemCoverPanels()
             return
         }
+
+        let shouldCoverItems = !appState.eventManager.isMouseInsideMenuBar
 
         let items = MenuBarItem.getMenuBarItems(onScreenOnly: true, activeSpaceOnly: true)
             .filter(\.isAuxiliaryStatusItem)
@@ -302,11 +312,16 @@ final class MenuBarManager: ObservableObject {
         }
 
         for item in items {
-            let coverFrame = item.frame.insetBy(dx: -2, dy: 0)
+            let coverFrame = item.frame
             guard let frame = appKitFrame(for: coverFrame) else {
                 continue
             }
             let panel = auxiliaryStatusItemCoverPanels[item.windowID] ?? createAuxiliaryStatusItemCoverPanel()
+            panel.setFrame(frame, display: true)
+            panel.alphaValue = shouldCoverItems ? 1 : 0
+            if shouldCoverItems {
+                panel.orderFrontRegardless()
+            }
             if
                 let image = ScreenCapture.captureScreenBelowWindow(
                     item.windowID,
@@ -317,8 +332,9 @@ final class MenuBarManager: ObservableObject {
             {
                 imageView.image = NSImage(cgImage: image, size: frame.size)
             }
-            panel.setFrame(frame, display: true)
-            panel.orderFrontRegardless()
+            if shouldCoverItems {
+                panel.orderFrontRegardless()
+            }
             auxiliaryStatusItemCoverPanels[item.windowID] = panel
         }
     }
