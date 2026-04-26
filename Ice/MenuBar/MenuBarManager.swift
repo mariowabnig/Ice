@@ -34,6 +34,9 @@ final class MenuBarManager: ObservableObject {
     /// The managed sections in the menu bar.
     private(set) var sections = [MenuBarSection]()
 
+    /// Panels that cover auxiliary status item windows while the system menu bar is hidden.
+    private var auxiliaryStatusItemCoverPanels = [CGWindowID: NSPanel]()
+
     /// The panel that contains the Ice Bar interface.
     let iceBarPanel: IceBarPanel
 
@@ -44,6 +47,12 @@ final class MenuBarManager: ObservableObject {
     /// information for the menu bar's average color.
     private var canUpdateAverageColorInfo: Bool {
         appState?.settingsWindow?.isVisible == true
+    }
+
+    /// A Boolean value that indicates whether the system menu bar is configured
+    /// to hide according to UserDefaults.
+    private var isMenuBarConfiguredToAutoHide: Bool {
+        Defaults.globalDomain["_HIHideMenuBar"] as? Bool ?? isMenuBarHiddenBySystemUserDefaults
     }
 
     /// Initializes a new menu bar manager instance.
@@ -84,6 +93,8 @@ final class MenuBarManager: ObservableObject {
     private func configureCancellables() {
         var c = Set<AnyCancellable>()
 
+        updateIsMenuBarHiddenBySystemUserDefaults()
+
         NSApp.publisher(for: \.currentSystemPresentationOptions)
             .receive(on: DispatchQueue.main)
             .sink { [weak self] options in
@@ -105,12 +116,34 @@ final class MenuBarManager: ObservableObject {
                 .receive(on: DispatchQueue.main)
                 .sink { [weak self] _ in
                     guard
-                        let self,
-                        let isMenuBarHidden = Defaults.globalDomain["_HIHideMenuBar"] as? Bool
+                        let self
                     else {
                         return
                     }
-                    isMenuBarHiddenBySystemUserDefaults = isMenuBarHidden
+                    updateIsMenuBarHiddenBySystemUserDefaults()
+                }
+                .store(in: &c)
+        }
+
+        if
+            let hiddenSection = section(withName: .hidden),
+            let window = hiddenSection.controlItem.window
+        {
+            window.publisher(for: \.frame)
+                .debounce(for: 0.1, scheduler: DispatchQueue.main)
+                .sink { [weak self, weak window] _ in
+                    guard
+                        let self,
+                        isMenuBarHiddenBySystemUserDefaults,
+                        let info = window.flatMap({ Bridging.getCGWindowID(for: $0).flatMap { WindowInfo(windowID: $0) } }),
+                        !info.isOnScreen,
+                        sections.contains(where: { !$0.isHidden })
+                    else {
+                        return
+                    }
+                    for section in sections {
+                        section.hide()
+                    }
                 }
                 .store(in: &c)
         }
@@ -145,6 +178,14 @@ final class MenuBarManager: ObservableObject {
             .autoconnect()
             .sink { [weak self] _ in
                 self?.updateAverageColorInfo()
+            }
+            .store(in: &c)
+
+        Timer.publish(every: 0.2, on: .main, in: .default)
+            .autoconnect()
+            .sink { [weak self] _ in
+                self?.updateIsMenuBarHiddenBySystemUserDefaults()
+                self?.updateAuxiliaryStatusItemCovers()
             }
             .store(in: &c)
 
@@ -217,10 +258,116 @@ final class MenuBarManager: ObservableObject {
                 } else if isHidingApplicationMenus {
                     showApplicationMenus()
                 }
+                updateAuxiliaryStatusItemCovers()
             }
             .store(in: &c)
 
         cancellables = c
+    }
+
+    /// Updates whether UserDefaults says the system menu bar should hide.
+    private func updateIsMenuBarHiddenBySystemUserDefaults() {
+        guard let isMenuBarHidden = Defaults.globalDomain["_HIHideMenuBar"] as? Bool else {
+            return
+        }
+        if isMenuBarHiddenBySystemUserDefaults != isMenuBarHidden {
+            isMenuBarHiddenBySystemUserDefaults = isMenuBarHidden
+        }
+    }
+
+    /// Updates the cover panels that hide app-owned auxiliary status item windows
+    /// while macOS has retracted an automatically hidden menu bar.
+    private func updateAuxiliaryStatusItemCovers() {
+        guard
+            let appState,
+            isMenuBarConfiguredToAutoHide,
+            !appState.eventManager.isMouseInsideMenuBar
+        else {
+            closeAuxiliaryStatusItemCoverPanels()
+            return
+        }
+
+        let items = MenuBarItem.getMenuBarItems(onScreenOnly: true, activeSpaceOnly: true)
+            .filter(\.isAuxiliaryStatusItem)
+
+        guard !items.isEmpty else {
+            closeAuxiliaryStatusItemCoverPanels()
+            return
+        }
+
+        let itemWindowIDs = Set(items.map(\.windowID))
+
+        for windowID in auxiliaryStatusItemCoverPanels.keys where !itemWindowIDs.contains(windowID) {
+            auxiliaryStatusItemCoverPanels.removeValue(forKey: windowID)?.close()
+        }
+
+        for item in items {
+            let coverFrame = item.frame.insetBy(dx: -2, dy: 0)
+            guard let frame = appKitFrame(for: coverFrame) else {
+                continue
+            }
+            let panel = auxiliaryStatusItemCoverPanels[item.windowID] ?? createAuxiliaryStatusItemCoverPanel()
+            if
+                let image = ScreenCapture.captureScreenBelowWindow(
+                    item.windowID,
+                    screenBounds: coverFrame,
+                    option: [.boundsIgnoreFraming, .bestResolution]
+                ),
+                let imageView = panel.contentView as? NSImageView
+            {
+                imageView.image = NSImage(cgImage: image, size: frame.size)
+            }
+            panel.setFrame(frame, display: true)
+            panel.orderFrontRegardless()
+            auxiliaryStatusItemCoverPanels[item.windowID] = panel
+        }
+    }
+
+    /// Closes all cover panels for app-owned auxiliary status item windows.
+    private func closeAuxiliaryStatusItemCoverPanels() {
+        for panel in auxiliaryStatusItemCoverPanels.values {
+            panel.close()
+        }
+        auxiliaryStatusItemCoverPanels.removeAll()
+    }
+
+    /// Creates a panel that visually covers an auxiliary status item window.
+    private func createAuxiliaryStatusItemCoverPanel() -> NSPanel {
+        let panel = NSPanel(
+            contentRect: .zero,
+            styleMask: [.borderless, .nonactivatingPanel],
+            backing: .buffered,
+            defer: false
+        )
+        panel.title = "Auxiliary Status Item Cover"
+        panel.level = .mainMenu + 2
+        panel.collectionBehavior = [.fullScreenAuxiliary, .ignoresCycle, .moveToActiveSpace]
+        panel.backgroundColor = .clear
+        panel.hasShadow = false
+        panel.ignoresMouseEvents = true
+        panel.isOpaque = false
+
+        let imageView = NSImageView()
+        imageView.autoresizingMask = [.width, .height]
+        imageView.imageScaling = .scaleAxesIndependently
+        panel.contentView = imageView
+
+        return panel
+    }
+
+    /// Converts a CoreGraphics-coordinate frame into AppKit screen coordinates.
+    private func appKitFrame(for coreGraphicsFrame: CGRect) -> CGRect? {
+        guard let screen = NSScreen.screens.first(where: { screen in
+            CGDisplayBounds(screen.displayID).intersects(coreGraphicsFrame)
+        }) else {
+            return nil
+        }
+        return CGRect(
+            x: coreGraphicsFrame.minX,
+            y: screen.frame.maxY - coreGraphicsFrame.maxY,
+            width: coreGraphicsFrame.width,
+            height: coreGraphicsFrame.height
+        )
     }
 
     /// Updates the ``averageColorInfo`` property with the current average color

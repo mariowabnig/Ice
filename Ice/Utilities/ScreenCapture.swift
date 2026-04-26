@@ -80,6 +80,11 @@ enum ScreenCapture {
     static func captureWindow(_ windowID: CGWindowID, screenBounds: CGRect? = nil, option: CGWindowImageOption = []) -> CGImage? {
         captureWindows([windowID], screenBounds: screenBounds, option: option)
     }
+
+    /// Captures the screen contents below the specified window.
+    static func captureScreenBelowWindow(_ windowID: CGWindowID, screenBounds: CGRect, option: CGWindowImageOption = []) -> CGImage? {
+        createCGWindowListImage(screenBounds, .optionOnScreenBelowWindow, windowID, option)
+    }
 }
 
 /// A protocol used to suppress deprecation warnings for the `CGWindowList` screen capture APIs.
@@ -97,3 +102,11 @@ private extension WindowListImage {
 }
 
 extension CGImage: WindowListImage { }
+
+@_silgen_name("CGWindowListCreateImage")
+private func createCGWindowListImage(
+    _ screenBounds: CGRect,
+    _ listOption: CGWindowListOption,
+    _ windowID: CGWindowID,
+    _ imageOption: CGWindowImageOption
+) -> CGImage?
