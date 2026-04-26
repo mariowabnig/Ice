@@ -49,7 +49,6 @@ brew install --cask jordanbaird-ice
 - [x] Hide application menus when they overlap with shown menu bar items
 - [x] Drag and drop interface to arrange individual menu bar items
 - [x] Discover visible auxiliary status-level items that are not returned by macOS's private menu bar item list
-- [x] Keep auxiliary status-level items anchored while hidden items are shown beside them
 - [x] Keep auxiliary status-level items visually hidden while an automatically hidden menu bar is retracted
 - [x] Display hidden menu bar items in a separate bar (e.g. for MacBooks with the notch)
 - [x] Search menu bar items
@@ -91,7 +90,7 @@ Ice uses a number of system APIs that are available starting in macOS 14. As suc
 
 ## Automatically hidden menu bars
 
-Ice can show and rehide hidden items when macOS is configured to automatically hide and show the menu bar. Some menu bar apps also draw their own status-level windows instead of relying only on macOS's native status item list. Ice treats visible auxiliary status-level windows as menu bar items when possible, reserves room from their hidden-state position while hidden items are shown, and visually covers them while the system menu bar is retracted so they do not remain visible on the desktop.
+Ice can show and rehide hidden items when macOS is configured to automatically hide and show the menu bar. Some menu bar apps also draw their own status-level windows instead of relying only on macOS's native status item list. Ice treats visible auxiliary status-level windows as menu bar items when possible, reserves room for them while hidden items are shown, and visually covers them while the system menu bar is retracted so they do not remain visible on the desktop.
 
 Menu bar layout editing still requires a permanently visible menu bar. If the Menu Bar Layout pane says Ice cannot arrange items in automatically hidden menu bars, temporarily set `Automatically hide and show the menu bar` to `Never`, arrange the items, then restore your preferred setting.
 
