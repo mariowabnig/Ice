@@ -43,6 +43,9 @@ final class MenuBarManager: ObservableObject {
     /// The last CoreGraphics frames applied to auxiliary status item cover panels.
     private var auxiliaryStatusItemCoverFrames = [CGWindowID: CGRect]()
 
+    /// The last display mode applied to auxiliary status item cover panels.
+    private var auxiliaryStatusItemCoverModes = [CGWindowID: AuxiliaryStatusItemCoverMode]()
+
     /// The panel that contains the Ice Bar interface.
     let iceBarPanel: IceBarPanel
 
@@ -59,6 +62,15 @@ final class MenuBarManager: ObservableObject {
     /// to hide according to UserDefaults.
     private var isMenuBarConfiguredToAutoHide: Bool {
         Defaults.globalDomain["_HIHideMenuBar"] as? Bool ?? isMenuBarHiddenBySystemUserDefaults
+    }
+
+    /// A visual mode for an auxiliary status item cover panel.
+    private enum AuxiliaryStatusItemCoverMode: Equatable {
+        /// Hide the item while the system menu bar is retracted.
+        case hide
+
+        /// Redraw the item centered inside its owning menu bar.
+        case center(itemFrame: CGRect)
     }
 
     /// Initializes a new menu bar manager instance.
@@ -310,10 +322,7 @@ final class MenuBarManager: ObservableObject {
     /// Updates cover panels after pointer movement, without refreshing images
     /// unless the covers need to change visibility.
     private func updateAuxiliaryStatusItemCoversForPointerChange() {
-        guard
-            let appState,
-            isMenuBarConfiguredToAutoHide
-        else {
+        guard let appState else {
             closeAuxiliaryStatusItemCoverPanels()
             return
         }
@@ -329,33 +338,41 @@ final class MenuBarManager: ObservableObject {
     /// Updates the cover panels that hide app-owned auxiliary status item windows
     /// while macOS has retracted an automatically hidden menu bar.
     private func updateAuxiliaryStatusItemCovers(refreshImages: Bool = false) {
-        guard
-            let appState,
-            isMenuBarConfiguredToAutoHide
-        else {
+        guard let appState else {
             closeAuxiliaryStatusItemCoverPanels()
             return
         }
 
         let shouldCoverItems = shouldCoverAuxiliaryStatusItems(appState: appState)
 
-        let items = MenuBarItem.getMenuBarItems(onScreenOnly: true, activeSpaceOnly: true)
+        let coverContexts = MenuBarItem.getMenuBarItems(onScreenOnly: true, activeSpaceOnly: true)
             .filter(\.isAuxiliaryStatusItem)
+            .compactMap { item -> (item: MenuBarItem, frame: CGRect, mode: AuxiliaryStatusItemCoverMode)? in
+                if shouldCoverItems {
+                    return (item, item.frame, .hide)
+                }
+                guard let centeringFrame = auxiliaryStatusItemCenteringCoverFrame(for: item) else {
+                    return nil
+                }
+                return (item, centeringFrame, .center(itemFrame: item.frame))
+            }
 
-        guard !items.isEmpty else {
+        guard !coverContexts.isEmpty else {
             closeAuxiliaryStatusItemCoverPanels()
             return
         }
 
-        let itemWindowIDs = Set(items.map(\.windowID))
+        let itemWindowIDs = Set(coverContexts.map(\.item.windowID))
 
         for windowID in auxiliaryStatusItemCoverPanels.keys where !itemWindowIDs.contains(windowID) {
             auxiliaryStatusItemCoverPanels.removeValue(forKey: windowID)?.close()
             auxiliaryStatusItemCoverFrames.removeValue(forKey: windowID)
+            auxiliaryStatusItemCoverModes.removeValue(forKey: windowID)
         }
 
-        for item in items {
-            let coverFrame = item.frame
+        for context in coverContexts {
+            let item = context.item
+            let coverFrame = context.frame
             guard let frame = appKitFrame(for: coverFrame) else {
                 continue
             }
@@ -365,40 +382,94 @@ final class MenuBarManager: ObservableObject {
             let needsImageRefresh =
                 refreshImages ||
                 auxiliaryStatusItemCoverFrames[item.windowID] != coverFrame ||
+                auxiliaryStatusItemCoverModes[item.windowID] != context.mode ||
                 imageView?.image == nil
 
-            if shouldCoverItems, needsImageRefresh {
-                if
-                    let image = ScreenCapture.captureScreenBelowWindow(
-                        item.windowID,
-                        screenBounds: coverFrame,
-                        option: [.boundsIgnoreFraming, .bestResolution]
-                    ),
-                    let imageView
-                {
-                    imageView.image = NSImage(cgImage: image, size: frame.size)
-                } else if imageView?.image == nil {
+            if needsImageRefresh, let imageView {
+                guard let image = auxiliaryStatusItemCoverImage(for: item, coverFrame: coverFrame, mode: context.mode, size: frame.size) else {
                     continue
                 }
+                imageView.image = image
             }
 
             NSAnimationContext.runAnimationGroup { context in
                 context.duration = 0
                 context.allowsImplicitAnimation = false
                 panel.setFrame(frame, display: true)
-                panel.alphaValue = shouldCoverItems ? 1 : 0
+                panel.alphaValue = 1
             }
 
-            if shouldCoverItems {
-                panel.orderFrontRegardless()
-            } else if auxiliaryStatusItemCoversAreVisible {
-                panel.orderOut(nil)
-            }
+            panel.orderFrontRegardless()
             auxiliaryStatusItemCoverPanels[item.windowID] = panel
             auxiliaryStatusItemCoverFrames[item.windowID] = coverFrame
+            auxiliaryStatusItemCoverModes[item.windowID] = context.mode
         }
 
         auxiliaryStatusItemCoversAreVisible = shouldCoverItems
+    }
+
+    /// Returns the menu bar-height frame needed to visually center an auxiliary
+    /// status item whose own window is pinned to the top edge of the menu bar.
+    private func auxiliaryStatusItemCenteringCoverFrame(for item: MenuBarItem) -> CGRect? {
+        guard
+            let screen = NSScreen.screens.first(where: { CGDisplayBounds($0.displayID).intersects(item.frame) }),
+            let menuBarHeight = WindowInfo.getMenuBarWindow(for: screen.displayID)?.frame.height ?? screen.getMenuBarHeight()
+        else {
+            return nil
+        }
+
+        let displayBounds = CGDisplayBounds(screen.displayID)
+        let centeredMinY = displayBounds.minY + ((menuBarHeight - item.frame.height) / 2)
+
+        guard
+            item.frame.height < menuBarHeight - 1,
+            abs(item.frame.minY - centeredMinY) > 1
+        else {
+            return nil
+        }
+
+        return CGRect(
+            x: item.frame.minX,
+            y: displayBounds.minY,
+            width: item.frame.width,
+            height: menuBarHeight
+        )
+    }
+
+    /// Creates the image displayed by an auxiliary status item cover panel.
+    private func auxiliaryStatusItemCoverImage(
+        for item: MenuBarItem,
+        coverFrame: CGRect,
+        mode: AuxiliaryStatusItemCoverMode,
+        size: CGSize
+    ) -> NSImage? {
+        guard let backgroundImage = ScreenCapture.captureScreenBelowWindow(
+            item.windowID,
+            screenBounds: coverFrame,
+            option: [.boundsIgnoreFraming, .bestResolution]
+        ) else {
+            return nil
+        }
+
+        let image = NSImage(size: size)
+        image.lockFocus()
+        defer { image.unlockFocus() }
+
+        NSImage(cgImage: backgroundImage, size: size).draw(in: CGRect(origin: .zero, size: size))
+
+        if
+            case .center(let itemFrame) = mode,
+            let itemImage = ScreenCapture.captureWindow(item.windowID, option: [.boundsIgnoreFraming, .bestResolution])
+        {
+            let itemSize = CGSize(width: itemFrame.width, height: itemFrame.height)
+            let itemOrigin = CGPoint(
+                x: itemFrame.minX - coverFrame.minX,
+                y: (coverFrame.height - itemFrame.height) / 2
+            )
+            NSImage(cgImage: itemImage, size: itemSize).draw(in: CGRect(origin: itemOrigin, size: itemSize))
+        }
+
+        return image
     }
 
     /// Closes all cover panels for app-owned auxiliary status item windows.
@@ -408,6 +479,7 @@ final class MenuBarManager: ObservableObject {
         }
         auxiliaryStatusItemCoverPanels.removeAll()
         auxiliaryStatusItemCoverFrames.removeAll()
+        auxiliaryStatusItemCoverModes.removeAll()
         auxiliaryStatusItemCoversAreVisible = false
     }
 
