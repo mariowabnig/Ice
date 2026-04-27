@@ -379,10 +379,15 @@ private struct IceBarItemView: View {
 
     private var image: NSImage? {
         guard
-            let image = imageCache.images[item.windowID],
+            let cachedImage = imageCache.images[item.windowID],
             let screen = imageCache.screen
         else {
             return nil
+        }
+        let image = if item.isAuxiliaryStatusItem {
+            cachedImage.trimmingTransparentPixels(around: [.minXEdge, .maxXEdge]) ?? cachedImage
+        } else {
+            cachedImage
         }
         let size = CGSize(
             width: CGFloat(image.width) / screen.backingScaleFactor,

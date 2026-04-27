@@ -53,7 +53,7 @@ final class ControlItem {
     private let auxiliaryStatusItemPadding: CGFloat = 6
 
     /// Auxiliary status item frames captured while the hidden section is hidden.
-    private var auxiliaryStatusItemReservationFrames = [MenuBarItemInfo: CGRect]()
+    private var auxiliaryStatusItemReservationFrames = [CGRect]()
 
     /// Storage for internal observers.
     private var cancellables = Set<AnyCancellable>()
@@ -334,11 +334,9 @@ final class ControlItem {
             return
         }
 
-        auxiliaryStatusItemReservationFrames = items.reduce(into: [:]) { frames, item in
-            if item.isAuxiliaryStatusItem {
-                frames[item.info] = item.frame
-            }
-        }
+        auxiliaryStatusItemReservationFrames = items
+            .filter(\.isAuxiliaryStatusItem)
+            .map(\.frame)
     }
 
     /// Returns extra length needed to keep auxiliary status windows clear when
@@ -358,7 +356,7 @@ final class ControlItem {
                 .filter(\.isAuxiliaryStatusItem)
                 .map(\.frame)
         } else {
-            Array(auxiliaryStatusItemReservationFrames.values)
+            auxiliaryStatusItemReservationFrames
         }
 
         guard let leftmostAuxiliaryItemMinX = auxiliaryFrames

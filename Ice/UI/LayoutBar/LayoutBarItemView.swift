@@ -98,7 +98,15 @@ final class LayoutBarItemView: NSView {
                     else {
                         return
                     }
-                    image = NSImage(cgImage: cgImage, size: CGSize(width: cgImage.width, height: cgImage.height))
+                    let displayImage = if item.isAuxiliaryStatusItem {
+                        cgImage.trimmingTransparentPixels(around: [.minXEdge, .maxXEdge]) ?? cgImage
+                    } else {
+                        cgImage
+                    }
+                    image = NSImage(
+                        cgImage: displayImage,
+                        size: CGSize(width: displayImage.width, height: displayImage.height)
+                    )
                 }
                 .store(in: &c)
         }
