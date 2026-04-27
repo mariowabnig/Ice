@@ -45,6 +45,8 @@ Ice treats auxiliary item frame changes as cache changes too. This is important 
 
 When the hidden section is shown in the native menu bar, Ice also keeps enough invisible divider width reserved for these auxiliary status windows. The reservation uses the auxiliary window frames captured while the hidden section is hidden, so newly shown native items are added to the left without pushing the auxiliary window around. This prevents hidden native menu bar items from sliding under an auxiliary overlay window that macOS does not manage as a normal status item.
 
+Some auxiliary status windows are shorter than the system menu bar and are pinned by macOS to the menu bar's top edge. Ice cannot move those third-party windows directly, so it places a pass-through visual cover over the item while the menu bar is visible, redraws the menu bar background, and paints the captured auxiliary item centered within the full menu bar height. The cover ignores mouse events, so clicks still reach the owning app's real status window.
+
 When Ice renders auxiliary windows inside Ice Bar or the Menu Bar Layout view, it trims transparent horizontal padding from the captured image. Some apps expose a much wider status-level window than the content they actually draw, and trimming keeps those items from appearing offset inside Ice's own UI.
 
 Implementation note: Ice's hide/show control is driven by both the control item's published hiding state and the spacer length applied to the status item. When updating this flow, make length and auxiliary reservation calculations use the state value currently being applied, because reading the stored state during a publisher callback can be stale and can leave hidden items visible after the user clicks Hide.
@@ -55,7 +57,9 @@ This is intentionally generic. It does not hardcode Portworth, but Portworth's s
 
 Some apps draw their own status-level window in the menu bar. Portworth is one example. These windows are owned by the app, not by Ice or the macOS menu bar, so Ice cannot move or hide them the same way it moves native status items.
 
-When the macOS menu bar is configured to automatically hide and show, Ice handles these auxiliary status-level windows by placing a transparent cover window over each auxiliary item. The cover stays invisible while the menu bar is shown, tracks the auxiliary item's current position, and becomes visible as soon as the pointer leaves the menu bar. Ice refreshes the cover image when the cover appears, when the auxiliary item moves, and periodically while hidden, instead of recapturing it on every pointer movement.
+When the macOS menu bar is configured to automatically hide and show, Ice handles these auxiliary status-level windows by placing a cover window over each auxiliary item. The cover tracks the auxiliary item's current position and becomes visible as soon as the pointer leaves the menu bar. Ice refreshes the cover image when the cover appears, when the auxiliary item moves, and periodically while hidden, instead of recapturing it on every pointer movement.
+
+The same cover mechanism may also be visible while the menu bar is shown for auxiliary windows that macOS pins to the top edge of the menu bar. In that case, Ice redraws the captured item centered in the menu bar instead of hiding it.
 
 This cover is visual only. The app that owns the auxiliary window still owns its window and may update or animate it independently.
 

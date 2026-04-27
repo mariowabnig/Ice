@@ -13,6 +13,7 @@ All notable changes to Ice are tracked here retroactively from the available git
 
 ### Changed
 - Auxiliary status item covers now cache and refresh their images only when needed, reducing flicker and avoiding unnecessary screen captures during pointer movement.
+- Auxiliary status item covers now redraw shorter top-pinned auxiliary windows centered in the visible menu bar while still passing mouse events through to the owning app.
 - Hidden-section reveal now reserves space from auxiliary status item frames captured while the hidden section is hidden, preventing native hidden items from sliding underneath app-owned overlays.
 - Auxiliary status item reservation now preserves every auxiliary frame instead of collapsing windows with the same simplified identity.
 - Ice Bar and Menu Bar Layout render auxiliary status item captures with transparent horizontal padding trimmed, so wide transparent app-owned windows do not appear oddly offset inside Ice's UI.
@@ -27,7 +28,7 @@ All notable changes to Ice are tracked here retroactively from the available git
 - Fixed macOS 26 compatibility where status item ownership and menu bar window behavior changed.
 
 ### Documentation
-- Documented auxiliary status item behavior, Portworth integration notes, auto-hidden menu bar limitations, and local install permission behavior in `FREQUENT_ISSUES.md`.
+- Documented auxiliary status item behavior, Portworth centering integration notes, auto-hidden menu bar limitations, and local install permission behavior in `FREQUENT_ISSUES.md`.
 - Documented automatically hidden menu bar support and auxiliary status-level item behavior in `README.md`.
 
 ## 0.11.13-dev.2 - 2025-09-16
@@ -133,4 +134,3 @@ All notable changes to Ice are tracked here retroactively from the available git
 
 ### Changed
 - 0.10 release line covering the previous generation of menu bar item management, appearance, and reliability improvements before the 0.11 beta series.
-
