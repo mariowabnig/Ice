@@ -39,7 +39,7 @@ What failed:
 
 What works:
 
-Ice now merges the private menu bar item list with auxiliary on-screen status-level windows whose titles start with their owning app's bundle identifier, or the dashed form of that bundle identifier. These auxiliary windows are cached as visible when they are on screen, because that matches what the user actually sees in the menu bar.
+Ice now merges the private menu bar item list with auxiliary on-screen status-level windows whose titles start with their owning app's bundle identifier, or the dashed form of that bundle identifier. If macOS reports a scripted/helper app's status-level window without a bundle identifier or CoreGraphics title, Ice can still treat the top-pinned app-owned window as auxiliary by using its owner name while excluding known system owners. These auxiliary windows are cached as visible when they are on screen, because that matches what the user actually sees in the menu bar.
 
 Ice treats auxiliary item frame changes as cache changes too. This is important for apps whose status-level windows move, resize, or change visibility without getting a new window identifier.
 
@@ -51,7 +51,7 @@ When Ice renders auxiliary windows inside Ice Bar or the Menu Bar Layout view, i
 
 Implementation note: Ice's hide/show control is driven by both the control item's published hiding state and the spacer length applied to the status item. When updating this flow, make length and auxiliary reservation calculations use the state value currently being applied, because reading the stored state during a publisher callback can be stale and can leave hidden items visible after the user clicks Hide.
 
-This is intentionally generic. It does not hardcode Portworth, but Portworth's stable `com.portworth.app.statusItem` window title gives Ice enough identity to show it in the Visible Section.
+This is intentionally generic. It does not hardcode Portworth, but Portworth's stable `com.portworth.app.statusItem` window title, or its app owner name on systems where CoreGraphics reports an empty title, gives Ice enough identity to show it in the Visible Section.
 
 ## A visible app remains onscreen when the menu bar auto-hides
 

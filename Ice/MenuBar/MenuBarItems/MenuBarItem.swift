@@ -137,15 +137,11 @@ struct MenuBarItem {
         guard
             isOnScreen,
             !isCurrentlyInMenuBar,
-            let title,
-            !title.isEmpty,
-            let bundleIdentifier = owningApplication?.bundleIdentifier
+            frame.height <= Self.auxiliaryStatusItemMaxHeight(for: window)
         else {
             return false
         }
-
-        let dashedBundleIdentifier = bundleIdentifier.replacingOccurrences(of: ".", with: "-")
-        return title.hasPrefix(bundleIdentifier) || title.hasPrefix(dashedBundleIdentifier)
+        return Self.hasAuxiliaryStatusItemIdentity(window: window)
     }
 
     /// A string to use for logging purposes.
@@ -205,16 +201,12 @@ extension MenuBarItem {
             !excludedWindowIDs.contains(window.windowID),
             window.isMenuBarItem,
             window.isOnScreen,
-            window.alpha > 0,
-            let title = window.title,
-            !title.isEmpty,
-            let bundleIdentifier = window.owningApplication?.bundleIdentifier
+            window.alpha > 0
         else {
             return false
         }
 
-        let dashedBundleIdentifier = bundleIdentifier.replacingOccurrences(of: ".", with: "-")
-        guard title.hasPrefix(bundleIdentifier) || title.hasPrefix(dashedBundleIdentifier) else {
+        guard hasAuxiliaryStatusItemIdentity(window: window) else {
             return false
         }
 
@@ -230,7 +222,42 @@ extension MenuBarItem {
             return false
         }
 
-        return window.frame.height <= NSStatusBar.system.thickness + 10
+        return window.frame.height <= auxiliaryStatusItemMaxHeight(for: window)
+    }
+
+    private static func auxiliaryStatusItemMaxHeight(for window: WindowInfo) -> CGFloat {
+        let screen = NSScreen.screens.first { CGDisplayBounds($0.displayID).intersects(window.frame) }
+        let menuBarHeight = screen.flatMap {
+            WindowInfo.getMenuBarWindow(for: $0.displayID)?.frame.height ?? $0.getMenuBarHeight()
+        } ?? NSStatusBar.system.thickness
+        return max(menuBarHeight, NSStatusBar.system.thickness) + 10
+    }
+
+    private static func hasAuxiliaryStatusItemIdentity(window: WindowInfo) -> Bool {
+        if
+            let title = window.title,
+            !title.isEmpty,
+            let bundleIdentifier = window.owningApplication?.bundleIdentifier
+        {
+            let dashedBundleIdentifier = bundleIdentifier.replacingOccurrences(of: ".", with: "-")
+            return title.hasPrefix(bundleIdentifier) || title.hasPrefix(dashedBundleIdentifier)
+        }
+
+        // Scripted or helper-driven menu bar apps can expose status-level windows
+        // without a bundle identifier or CoreGraphics title. Keep this narrow to
+        // top-pinned, app-owned windows so clicks on those overlays are not
+        // mistaken for empty menu bar space.
+        guard let ownerName = window.ownerName, !ownerName.isEmpty else {
+            return false
+        }
+        let excludedOwnerNames = Set([
+            "Control Center",
+            "Kontrollzentrum",
+            "Dock",
+            "SystemUIServer",
+            "Window Server"
+        ])
+        return !excludedOwnerNames.contains(ownerName)
     }
 
     private static func getAuxiliaryStatusItems(
@@ -288,6 +315,7 @@ extension MenuBarItem {
             .compactMap { windowID in
                 MenuBarItem(windowID: windowID)
             }
+            .filter(titlePredicate)
         let auxiliaryItems = getAuxiliaryStatusItems(
             on: display,
             activeSpaceOnly: activeSpaceOnly,
@@ -295,7 +323,6 @@ extension MenuBarItem {
         )
 
         return (Array(bridgedItems) + auxiliaryItems)
-            .filter(titlePredicate)
             .sortedByOrderInMenuBar()
     }
 }
@@ -332,6 +359,8 @@ private extension MenuBarItemInfo {
             self.namespace = .ice
         } else if let bundleIdentifier = itemWindow.owningApplication?.bundleIdentifier {
             self.namespace = Namespace(bundleIdentifier)
+        } else if let ownerName = itemWindow.ownerName, !ownerName.isEmpty {
+            self.namespace = Namespace(ownerName)
         } else {
             self.namespace = .null
         }
