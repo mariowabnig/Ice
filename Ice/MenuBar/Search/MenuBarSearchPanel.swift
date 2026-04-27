@@ -409,10 +409,15 @@ private struct MenuBarSearchItemView: View {
 
     private var image: NSImage? {
         guard
-            let image = imageCache.images[item.windowID]?.trimmingTransparentPixels(around: [.minXEdge, .maxXEdge]),
+            let cachedImage = imageCache.images[item.windowID],
             let screen = imageCache.screen
         else {
             return nil
+        }
+        let image = if item.isAuxiliaryStatusItem {
+            item.displayImage(from: cachedImage)
+        } else {
+            cachedImage.trimmingTransparentPixels(around: [.minXEdge, .maxXEdge]) ?? cachedImage
         }
         let size = CGSize(
             width: CGFloat(image.width) / screen.backingScaleFactor,

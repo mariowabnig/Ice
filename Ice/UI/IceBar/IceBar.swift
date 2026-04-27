@@ -384,11 +384,7 @@ private struct IceBarItemView: View {
         else {
             return nil
         }
-        let image = if item.isAuxiliaryStatusItem {
-            cachedImage.trimmingTransparentPixels(around: [.minXEdge, .maxXEdge]) ?? cachedImage
-        } else {
-            cachedImage
-        }
+        let image = item.displayImage(from: cachedImage)
         let size = CGSize(
             width: CGFloat(image.width) / screen.backingScaleFactor,
             height: CGFloat(image.height) / screen.backingScaleFactor

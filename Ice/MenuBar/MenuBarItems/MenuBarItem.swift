@@ -153,6 +153,18 @@ struct MenuBarItem {
         String(describing: info)
     }
 
+    /// Returns an image suitable for displaying this item in Ice's UI.
+    ///
+    /// App-owned auxiliary status windows can include transparent padding around
+    /// their visible content. Trimming that padding lets Ice center the visible
+    /// item the same way it centers ordinary menu bar item captures.
+    func displayImage(from image: CGImage) -> CGImage {
+        guard isAuxiliaryStatusItem else {
+            return image
+        }
+        return image.trimmingTransparentPixels() ?? image
+    }
+
     /// Creates a menu bar item from the given window.
     ///
     /// This initializer does not perform any checks on the window to ensure that
