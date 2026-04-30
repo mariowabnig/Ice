@@ -118,7 +118,11 @@ final class LayoutBarItemView: NSView {
     func provideAlertForDisabledItem() -> NSAlert {
         let alert = NSAlert()
         alert.messageText = "Menu bar item is not movable."
-        alert.informativeText = "macOS prohibits \"\(item.displayName)\" from being moved."
+        alert.informativeText = if item.isAuxiliaryStatusItem {
+            "\"\(item.displayName)\" is drawn by its app in a separate status-level window, so Ice cannot move it directly."
+        } else {
+            "macOS prohibits \"\(item.displayName)\" from being moved."
+        }
         return alert
     }
 
