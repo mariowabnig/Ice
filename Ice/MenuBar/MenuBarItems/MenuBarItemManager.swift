@@ -1217,9 +1217,11 @@ extension MenuBarItemManager {
             try await waitTask.value
         } catch is TaskTimeoutError {
             // On macOS 26, if the frame changed at all, consider it a success.
-            if ProcessInfo.processInfo.operatingSystemVersion.majorVersion >= 26,
-               let currentFrame = getCurrentFrame(for: item),
-               currentFrame != initialFrame {
+            if
+                ProcessInfo.processInfo.operatingSystemVersion.majorVersion >= 26,
+                let currentFrame = getCurrentFrame(for: item),
+                currentFrame != initialFrame
+            {
                 Logger.itemManager.info("Frame changed for \(item.logString), accepting move on macOS 26")
                 return
             }

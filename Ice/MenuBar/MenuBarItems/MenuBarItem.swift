@@ -255,7 +255,7 @@ extension MenuBarItem {
             "Kontrollzentrum",
             "Dock",
             "SystemUIServer",
-            "Window Server"
+            "Window Server",
         ])
         return !excludedOwnerNames.contains(ownerName)
     }

@@ -18,8 +18,11 @@ All notable changes to Ice are tracked here retroactively from the available git
 - Auxiliary status item reservation now preserves every auxiliary frame instead of collapsing windows with the same simplified identity.
 - Ice Bar and Menu Bar Layout render auxiliary status item captures with transparent horizontal padding trimmed, so wide transparent app-owned windows do not appear oddly offset inside Ice's UI.
 - Hidden-section hide/show updates now use the hiding state currently being applied when computing divider visibility and auxiliary reservation length.
+- Control items now reapply their current status item state after the menu bar section graph is initialized, so startup length and icon updates run with a valid owning section.
 
 ### Fixed
+- Fixed a recursive status item frame/length update loop that could crash Ice with a main-thread stack overflow.
+- Fixed startup behavior where items assigned to the Hidden Section could still appear in the native menu bar because the hidden spacer length was not reapplied.
 - Fixed hidden section hide transitions that could leave items visible after clicking Hide.
 - Fixed auxiliary status item reveal anchoring when hidden native items appear next to app-owned overlay windows.
 - Fixed auxiliary status item cover flicker after wake, unlock, or menu bar reconstruction.
@@ -28,6 +31,7 @@ All notable changes to Ice are tracked here retroactively from the available git
 - Fixed macOS 26 compatibility where status item ownership and menu bar window behavior changed.
 
 ### Documentation
+- Documented the control-item startup ordering and status item length requirements that keep hidden items offscreen.
 - Documented auxiliary status item behavior, Portworth centering integration notes, auto-hidden menu bar limitations, and local install permission behavior in `FREQUENT_ISSUES.md`.
 - Documented automatically hidden menu bar support and auxiliary status-level item behavior in `README.md`.
 

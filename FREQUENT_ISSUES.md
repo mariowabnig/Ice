@@ -51,6 +51,8 @@ When Ice renders auxiliary windows inside Ice Bar or the Menu Bar Layout view, i
 
 Implementation note: Ice's hide/show control is driven by both the control item's published hiding state and the spacer length applied to the status item. When updating this flow, make length and auxiliary reservation calculations use the state value currently being applied, because reading the stored state during a publisher callback can be stale and can leave hidden items visible after the user clicks Hide.
 
+Control items are constructed before `MenuBarManager.sections` has been assigned, so initial control item configuration cannot always resolve its owning section. After the section graph is assigned, reapply each control item's current state so the Ice icon and hidden-section spacer are configured from a valid section. Both `.hideItems` and `.showItems` updates must apply status item length changes; otherwise the layout view can show items in the Hidden Section while the native menu bar still displays them.
+
 This is intentionally generic. It does not hardcode Portworth, but Portworth's stable `com.portworth.app.statusItem` window title, or its app owner name on systems where CoreGraphics reports an empty title, gives Ice enough identity to show it in the Visible Section.
 
 ## A visible app remains onscreen when the menu bar auto-hides

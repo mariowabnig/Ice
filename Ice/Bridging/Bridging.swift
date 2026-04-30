@@ -77,9 +77,11 @@ extension Bridging {
         let screenY = screen.frame.height - frame.origin.y - frame.height
         for candidateID in getWindowList(option: [.onScreen, .menuBarItems]) {
             guard let candidateFrame = getWindowFrame(for: candidateID) else { continue }
-            if abs(candidateFrame.origin.x - frame.origin.x) < 2,
-               abs(candidateFrame.origin.y - screenY) < 2,
-               abs(candidateFrame.width - frame.width) < 2 {
+            if
+                abs(candidateFrame.origin.x - frame.origin.x) < 2,
+                abs(candidateFrame.origin.y - screenY) < 2,
+                abs(candidateFrame.width - frame.width) < 2
+            {
                 return candidateID
             }
         }

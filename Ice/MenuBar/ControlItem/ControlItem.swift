@@ -58,6 +58,9 @@ final class ControlItem {
     /// Storage for internal observers.
     private var cancellables = Set<AnyCancellable>()
 
+    /// Whether a window-frame change has already queued a status item refresh.
+    private var isWindowFrameStatusItemUpdatePending = false
+
     /// The menu bar section associated with the control item.
     private weak var section: MenuBarSection? {
         appState?.menuBarManager.sections.first { $0.controlItem === self }
@@ -142,6 +145,11 @@ final class ControlItem {
         StatusItemDefaults[.preferredPosition, autosaveName] = cached
     }
 
+    /// Reapplies the current status item state after the menu bar section graph changes.
+    func refreshStatusItem() {
+        updateStatusItem(with: state)
+    }
+
     /// Configures the internal observers for the control item.
     private func configureCancellables() {
         var c = Set<AnyCancellable>()
@@ -159,10 +167,10 @@ final class ControlItem {
                 }
                 if isVisible {
                     updateStatusItemLength(for: state)
-                    constraint?.isActive = true
+                    setConstraintActive(true)
                 } else {
-                    statusItem.length = 0
-                    constraint?.isActive = false
+                    setStatusItemLength(0)
+                    setConstraintActive(false)
                     if let window {
                         var size = window.frame.size
                         size.width = 1
@@ -175,7 +183,7 @@ final class ControlItem {
         constraint?.publisher(for: \.isActive)
             .removeDuplicates()
             .sink { [weak self] isActive in
-                self?.isVisible = isActive
+                self?.setVisible(isActive)
             }
             .store(in: &c)
 
@@ -220,7 +228,7 @@ final class ControlItem {
                     return
                 }
                 windowFrame = frame
-                updateStatusItem(with: state)
+                scheduleStatusItemUpdateFromWindowFrame()
             }
             .store(in: &c)
 
@@ -300,7 +308,7 @@ final class ControlItem {
                     else {
                         return
                     }
-                    isVisible = shouldShow
+                    setVisible(shouldShow)
                 }
                 .store(in: &c)
 
@@ -382,7 +390,7 @@ final class ControlItem {
 
         let state = state ?? self.state
 
-        statusItem.length = switch section.name {
+        let length = switch section.name {
         case .visible:
             Lengths.standard
         case .hidden:
@@ -400,6 +408,61 @@ final class ControlItem {
                 Lengths.standard
             }
         }
+
+        setStatusItemLength(length)
+    }
+
+    /// Queues a status item update after the current KVO/layout stack unwinds.
+    private func scheduleStatusItemUpdateFromWindowFrame() {
+        guard !isWindowFrameStatusItemUpdatePending else {
+            return
+        }
+
+        isWindowFrameStatusItemUpdatePending = true
+        Task { @MainActor [weak self] in
+            guard let self else {
+                return
+            }
+
+            isWindowFrameStatusItemUpdatePending = false
+            updateStatusItem(with: state)
+        }
+    }
+
+    /// Sets the published visibility only when it actually changes.
+    private func setVisible(_ isVisible: Bool) {
+        guard self.isVisible != isVisible else {
+            return
+        }
+
+        self.isVisible = isVisible
+    }
+
+    /// Sets the control item's constraint only when it actually changes.
+    private func setConstraintActive(_ isActive: Bool) {
+        guard constraint?.isActive != isActive else {
+            return
+        }
+
+        constraint?.isActive = isActive
+    }
+
+    /// Sets the status item length only when AppKit needs a layout change.
+    private func setStatusItemLength(_ length: CGFloat) {
+        let currentLength = statusItem.length
+        if currentLength == length {
+            return
+        }
+
+        if
+            currentLength.isFinite,
+            length.isFinite,
+            abs(currentLength - length) < 0.5
+        {
+            return
+        }
+
+        statusItem.length = length
     }
 
     /// Sets the initial configuration for the status item.
@@ -427,7 +490,8 @@ final class ControlItem {
 
         switch section.name {
         case .visible:
-            isVisible = true
+            setVisible(true)
+            updateStatusItemLength(for: state)
             // Enable the cell, as it may have been previously disabled.
             button.cell?.isEnabled = true
             let icon = appState.settingsManager.generalSettingsManager.iceIcon
@@ -451,16 +515,17 @@ final class ControlItem {
             switch state {
             case .hideItems:
                 updateAuxiliaryStatusItemReservationFrames(from: appState.itemManager.itemCache[.visible], for: state)
-                isVisible = true
+                setVisible(true)
                 // Prevent the cell from highlighting while expanded.
                 button.cell?.isEnabled = false
                 // Cell still sometimes briefly flashes on expansion unless manually unhighlighted.
                 button.isHighlighted = false
                 button.image = nil
+                updateStatusItemLength(for: state)
             case .showItems:
                 let showSectionDividers = appState.settingsManager.advancedSettingsManager.showSectionDividers
                 let shouldReserveAuxiliaryItemSpace = section.name == .hidden && auxiliaryStatusItemReservationLength(for: state) > 0
-                isVisible = showSectionDividers || shouldReserveAuxiliaryItemSpace
+                setVisible(showSectionDividers || shouldReserveAuxiliaryItemSpace)
                 // Enable the cell, as it may have been previously disabled.
                 button.cell?.isEnabled = true
                 // Set the image based on the section name and the hiding state.
