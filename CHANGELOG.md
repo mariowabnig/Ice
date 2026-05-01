@@ -24,6 +24,7 @@ All notable changes to Ice are tracked here retroactively from the available git
 - Fixed a recursive status item frame/length update loop that could crash Ice with a main-thread stack overflow.
 - Fixed startup behavior where items assigned to the Hidden Section could still appear in the native menu bar because the hidden spacer length was not reapplied.
 - Fixed hidden section hide transitions that could leave items visible after clicking Hide.
+- Fixed delayed auxiliary status item reveal with auto-hidden menu bars by falling back to the top-edge reveal band when the transient menu bar window frame does not yet contain the pointer.
 - Fixed auxiliary status item reveal anchoring when hidden native items appear next to app-owned overlay windows.
 - Fixed auxiliary status item cover flicker after wake, unlock, or menu bar reconstruction.
 - Fixed auxiliary status item layout detection so visible app-owned status windows are classified in the Visible Section instead of being missed or placed in a hidden section.

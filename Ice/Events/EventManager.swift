@@ -457,7 +457,9 @@ extension EventManager {
                 let mouseLocation = MouseCursor.locationCoreGraphics,
                 let menuBarWindow = WindowInfo.getMenuBarWindow(for: screen.displayID)
             {
-                return menuBarWindow.frame.contains(mouseLocation)
+                if menuBarWindow.frame.contains(mouseLocation) {
+                    return true
+                }
             }
             if let mouseLocation = MouseCursor.locationAppKit {
                 return screen.containsAppKitMenuBarPoint(mouseLocation)
