@@ -50,6 +50,10 @@ final class MenuBarManager: ObservableObject {
     /// auto-hide retraction animation.
     private var auxiliaryStatusItemCoverTask: Task<Void, Never>?
 
+    /// The delay used before retrying cover creation while the system menu bar
+    /// is retracting.
+    private let auxiliaryStatusItemCoverRetryDelay: Duration = .milliseconds(120)
+
     /// The panel that contains the Ice Bar interface.
     let iceBarPanel: IceBarPanel
 
@@ -324,6 +328,48 @@ final class MenuBarManager: ObservableObject {
         return !appState.eventManager.isMouseInsideMenuBar
     }
 
+    /// Returns a Boolean value that indicates whether the system menu bar has
+    /// finished retracting far enough for cover images to be captured cleanly.
+    private func canDrawHiddenAuxiliaryStatusItemCovers() -> Bool {
+        let windows = WindowInfo.getOnScreenWindows(excludeDesktopWindows: true)
+        let menuBarWindowIsOnScreen = NSScreen.screens.contains { screen in
+            WindowInfo.getMenuBarWindow(from: windows, for: screen.displayID) != nil
+        }
+
+        guard !menuBarWindowIsOnScreen else {
+            return false
+        }
+
+        guard
+            let hiddenSection = section(withName: .hidden),
+            let window = hiddenSection.controlItem.window,
+            let windowID = Bridging.getCGWindowID(for: window),
+            let info = WindowInfo(windowID: windowID)
+        else {
+            return true
+        }
+
+        return !info.isOnScreen
+    }
+
+    /// Schedules a cover update without extending an already-pending retry.
+    private func scheduleAuxiliaryStatusItemCoverUpdate(after delay: Duration) {
+        guard auxiliaryStatusItemCoverTask == nil else {
+            return
+        }
+
+        auxiliaryStatusItemCoverTask = Task { [weak self] in
+            try? await Task.sleep(for: delay)
+            guard !Task.isCancelled else {
+                return
+            }
+            await MainActor.run {
+                self?.auxiliaryStatusItemCoverTask = nil
+                self?.updateAuxiliaryStatusItemCovers(refreshImages: true, deferNewCovers: false)
+            }
+        }
+    }
+
     /// Updates cover panels after pointer movement, without refreshing images
     /// unless the covers need to change visibility.
     private func updateAuxiliaryStatusItemCoversForPointerChange() {
@@ -351,15 +397,17 @@ final class MenuBarManager: ObservableObject {
         }
 
         let shouldCoverItems = shouldCoverAuxiliaryStatusItems(appState: appState)
-        if shouldCoverItems, !auxiliaryStatusItemCoversAreVisible, deferNewCovers {
-            auxiliaryStatusItemCoverTask?.cancel()
-            closeAuxiliaryStatusItemCoverPanels()
-            auxiliaryStatusItemCoverTask = Task { [weak self] in
-                try? await Task.sleep(for: .milliseconds(180))
-                await MainActor.run {
-                    self?.updateAuxiliaryStatusItemCovers(refreshImages: true, deferNewCovers: false)
-                }
+        if shouldCoverItems {
+            guard canDrawHiddenAuxiliaryStatusItemCovers() else {
+                closeAuxiliaryStatusItemCoverPanels()
+                scheduleAuxiliaryStatusItemCoverUpdate(after: auxiliaryStatusItemCoverRetryDelay)
+                return
             }
+        }
+
+        if shouldCoverItems, !auxiliaryStatusItemCoversAreVisible, deferNewCovers {
+            closeAuxiliaryStatusItemCoverPanels()
+            scheduleAuxiliaryStatusItemCoverUpdate(after: auxiliaryStatusItemCoverRetryDelay)
             return
         }
 
