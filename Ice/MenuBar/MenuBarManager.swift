@@ -46,6 +46,10 @@ final class MenuBarManager: ObservableObject {
     /// The last display mode applied to auxiliary status item cover panels.
     private var auxiliaryStatusItemCoverModes = [CGWindowID: AuxiliaryStatusItemCoverMode]()
 
+    /// A delayed task used to avoid drawing cover panels during the menu bar's
+    /// auto-hide retraction animation.
+    private var auxiliaryStatusItemCoverTask: Task<Void, Never>?
+
     /// The panel that contains the Ice Bar interface.
     let iceBarPanel: IceBarPanel
 
@@ -338,13 +342,31 @@ final class MenuBarManager: ObservableObject {
 
     /// Updates the cover panels that hide app-owned auxiliary status item windows
     /// while macOS has retracted an automatically hidden menu bar.
-    private func updateAuxiliaryStatusItemCovers(refreshImages: Bool = false) {
+    private func updateAuxiliaryStatusItemCovers(refreshImages: Bool = false, deferNewCovers: Bool = true) {
         guard let appState else {
+            auxiliaryStatusItemCoverTask?.cancel()
+            auxiliaryStatusItemCoverTask = nil
             closeAuxiliaryStatusItemCoverPanels()
             return
         }
 
         let shouldCoverItems = shouldCoverAuxiliaryStatusItems(appState: appState)
+        if shouldCoverItems, !auxiliaryStatusItemCoversAreVisible, deferNewCovers {
+            auxiliaryStatusItemCoverTask?.cancel()
+            closeAuxiliaryStatusItemCoverPanels()
+            auxiliaryStatusItemCoverTask = Task { [weak self] in
+                try? await Task.sleep(for: .milliseconds(180))
+                await MainActor.run {
+                    self?.updateAuxiliaryStatusItemCovers(refreshImages: true, deferNewCovers: false)
+                }
+            }
+            return
+        }
+
+        if !shouldCoverItems {
+            auxiliaryStatusItemCoverTask?.cancel()
+            auxiliaryStatusItemCoverTask = nil
+        }
 
         let coverContexts = MenuBarItem.getMenuBarItems(onScreenOnly: true, activeSpaceOnly: true)
             .filter(\.isAuxiliaryStatusItem)
@@ -360,6 +382,7 @@ final class MenuBarManager: ObservableObject {
 
         guard !coverContexts.isEmpty else {
             closeAuxiliaryStatusItemCoverPanels()
+            auxiliaryStatusItemCoverTask = nil
             return
         }
 
@@ -407,6 +430,7 @@ final class MenuBarManager: ObservableObject {
         }
 
         auxiliaryStatusItemCoversAreVisible = shouldCoverItems
+        auxiliaryStatusItemCoverTask = nil
     }
 
     /// Returns the menu bar-height frame needed to visually center an auxiliary

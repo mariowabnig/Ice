@@ -59,7 +59,7 @@ This is intentionally generic. It does not hardcode Portworth, but Portworth's s
 
 Some apps draw their own status-level window in the menu bar. Portworth is one example. These windows are owned by the app, not by Ice or the macOS menu bar, so Ice cannot move or hide them the same way it moves native status items.
 
-When the macOS menu bar is configured to automatically hide and show, Ice handles these auxiliary status-level windows by placing a cover window over each auxiliary item. The cover tracks the auxiliary item's current position and becomes visible as soon as the pointer leaves the menu bar. Ice refreshes the cover image when the cover appears, when the auxiliary item moves, and periodically while hidden, instead of recapturing it on every pointer movement.
+When the macOS menu bar is configured to automatically hide and show, Ice handles these auxiliary status-level windows by placing a cover window over each auxiliary item. The cover tracks the auxiliary item's current position and appears shortly after the pointer leaves the menu bar, after the system retraction animation has had time to settle and Ice has re-scanned auxiliary windows. Ice refreshes the cover image when the cover appears, when the auxiliary item moves, and periodically while hidden, instead of recapturing it on every pointer movement.
 
 The same cover mechanism may also be visible while the menu bar is shown for auxiliary windows that macOS pins to the top edge of the menu bar. In that case, Ice redraws the captured item centered in the menu bar instead of hiding it.
 
