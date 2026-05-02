@@ -47,12 +47,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             guard !appState.isPreview else {
                 return
             }
+            Logger.appDelegate.warning(
+                "[diag] did finish permissions=\(String(describing: appState.permissionsManager.permissionsState))"
+            )
             // If we have the required permissions, set up the shared app state.
             // Otherwise, open the permissions window.
             switch appState.permissionsManager.permissionsState {
             case .hasAllPermissions, .hasRequiredPermissions:
+                Logger.appDelegate.warning("[diag] calling performSetup")
                 appState.performSetup()
             case .missingPermissions:
+                Logger.appDelegate.warning("[diag] opening permissions window")
                 appState.activate(withPolicy: .regular)
                 appState.openPermissionsWindow()
             }
