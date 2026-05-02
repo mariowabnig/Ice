@@ -412,6 +412,16 @@ final class MenuBarManager: ObservableObject {
         Logger.menuBarManager.diagnostic(
             "aux covers update shouldCover=\(shouldCoverItems) suppressVisibleCentering=\(shouldSuppressVisibleCenteringCovers) coversVisible=\(auxiliaryStatusItemCoversAreVisible) refreshImages=\(refreshImages) deferNew=\(deferNewCovers)"
         )
+
+        if
+            !refreshImages,
+            auxiliaryStatusItemCoverTask == nil,
+            auxiliaryStatusItemCoverPanels.isEmpty,
+            shouldCoverItems == auxiliaryStatusItemCoversAreVisible
+        {
+            return
+        }
+
         if !shouldCoverItems {
             auxiliaryStatusItemCoverTask?.cancel()
             auxiliaryStatusItemCoverTask = nil
