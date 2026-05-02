@@ -89,6 +89,7 @@ final class EventManager {
 
     /// Sets up the manager.
     func performSetup() {
+        Logger.eventManager.diagnostic("event manager setup")
         startAll()
         configureCancellables()
     }

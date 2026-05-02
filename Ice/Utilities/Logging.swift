@@ -28,10 +28,7 @@ struct Logger {
 
     /// Logs diagnostic information when explicitly enabled.
     func diagnostic(_ message: String) {
-        guard UserDefaults.standard.bool(forKey: "_IceMenuBarDiagnostics") else {
-            return
-        }
-        base.info("[diag] \(message, privacy: .public)")
+        base.warning("[diag] \(message, privacy: .public)")
     }
 
     /// Logs the given error message to the logger.
