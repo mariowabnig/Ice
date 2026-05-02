@@ -461,13 +461,19 @@ extension EventManager {
                     return true
                 }
             }
-            if let mouseLocation = MouseCursor.locationAppKit {
-                return screen.containsAppKitMenuBarPoint(mouseLocation)
+            if
+                let mouseLocation = MouseCursor.locationAppKit,
+                screen.containsAppKitMenuBarPoint(mouseLocation)
+            {
+                return true
             }
-        } else if let mouseLocation = MouseCursor.locationAppKit {
-            return screen.containsAppKitMenuBarPoint(mouseLocation)
+        } else if
+            let mouseLocation = MouseCursor.locationAppKit,
+            screen.containsAppKitMenuBarPoint(mouseLocation)
+        {
+            return true
         }
-        return false
+        return isMouseInsideMenuBarItem(on: screen)
     }
 
     /// A Boolean value that indicates whether the mouse pointer is within
@@ -489,10 +495,16 @@ extension EventManager {
     /// A Boolean value that indicates whether the mouse pointer is within
     /// the bounds of a menu bar item.
     var isMouseInsideMenuBarItem: Bool {
-        guard
-            let screen = bestScreen,
-            let mouseLocation = MouseCursor.locationCoreGraphics
-        else {
+        guard let screen = bestScreen else {
+            return false
+        }
+        return isMouseInsideMenuBarItem(on: screen)
+    }
+
+    /// Returns whether the mouse pointer is within the bounds of a visible menu
+    /// bar item on the given screen.
+    private func isMouseInsideMenuBarItem(on screen: NSScreen) -> Bool {
+        guard let mouseLocation = MouseCursor.locationCoreGraphics else {
             return false
         }
         let menuBarItems = MenuBarItem.getMenuBarItems(on: screen.displayID, onScreenOnly: true, activeSpaceOnly: true)
