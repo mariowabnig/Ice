@@ -412,22 +412,6 @@ final class MenuBarManager: ObservableObject {
         Logger.menuBarManager.diagnostic(
             "aux covers update shouldCover=\(shouldCoverItems) suppressVisibleCentering=\(shouldSuppressVisibleCenteringCovers) coversVisible=\(auxiliaryStatusItemCoversAreVisible) refreshImages=\(refreshImages) deferNew=\(deferNewCovers)"
         )
-        if shouldCoverItems {
-            guard canDrawHiddenAuxiliaryStatusItemCovers() else {
-                Logger.menuBarManager.diagnostic("aux covers deferred until hidden menu bar is settled")
-                closeAuxiliaryStatusItemCoverPanels()
-                scheduleAuxiliaryStatusItemCoverUpdate(after: auxiliaryStatusItemCoverRetryDelay)
-                return
-            }
-        }
-
-        if shouldCoverItems, !auxiliaryStatusItemCoversAreVisible, deferNewCovers {
-            Logger.menuBarManager.diagnostic("aux covers scheduling delayed creation")
-            closeAuxiliaryStatusItemCoverPanels()
-            scheduleAuxiliaryStatusItemCoverUpdate(after: auxiliaryStatusItemCoverRetryDelay)
-            return
-        }
-
         if !shouldCoverItems {
             auxiliaryStatusItemCoverTask?.cancel()
             auxiliaryStatusItemCoverTask = nil
@@ -452,6 +436,22 @@ final class MenuBarManager: ObservableObject {
             Logger.menuBarManager.diagnostic("aux covers closing; no cover contexts")
             closeAuxiliaryStatusItemCoverPanels()
             auxiliaryStatusItemCoverTask = nil
+            return
+        }
+
+        if shouldCoverItems {
+            guard canDrawHiddenAuxiliaryStatusItemCovers() else {
+                Logger.menuBarManager.diagnostic("aux covers deferred until hidden menu bar is settled")
+                closeAuxiliaryStatusItemCoverPanels()
+                scheduleAuxiliaryStatusItemCoverUpdate(after: auxiliaryStatusItemCoverRetryDelay)
+                return
+            }
+        }
+
+        if shouldCoverItems, !auxiliaryStatusItemCoversAreVisible, deferNewCovers {
+            Logger.menuBarManager.diagnostic("aux covers scheduling delayed creation")
+            closeAuxiliaryStatusItemCoverPanels()
+            scheduleAuxiliaryStatusItemCoverUpdate(after: auxiliaryStatusItemCoverRetryDelay)
             return
         }
 
