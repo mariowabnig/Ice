@@ -135,6 +135,9 @@ final class MenuBarSection {
         else {
             return
         }
+        Logger.menuBarSection.diagnostic(
+            "show requested section=\(name.logString) controlState=\(controlItem.state) useIceBar=\(useIceBar)"
+        )
         guard controlItem.isAddedToMenuBar else {
             // The section is disabled.
             // TODO: Can we use isEnabled for this check?
@@ -196,6 +199,9 @@ final class MenuBarSection {
         else {
             return
         }
+        Logger.menuBarSection.diagnostic(
+            "hide requested section=\(name.logString) controlState=\(controlItem.state) useIceBar=\(useIceBar)"
+        )
         iceBarPanel?.close()
         switch name {
         case _ where useIceBar:

@@ -238,6 +238,7 @@ final class MenuBarOverlayPanel: NSPanel {
         if let appState {
             appState.menuBarManager.$isMenuBarHiddenBySystem
                 .sink { [weak self] isHidden in
+                    Logger.overlayPanel.diagnostic("system hidden changed; overlay alpha=\(isHidden ? 0 : 1)")
                     self?.alphaValue = isHidden ? 0 : 1
                 }
                 .store(in: &c)
@@ -341,11 +342,13 @@ final class MenuBarOverlayPanel: NSPanel {
 
         alphaValue = 0
         setFrame(newFrame, display: false)
+        Logger.overlayPanel.diagnostic("show frame=\(NSStringFromRect(newFrame))")
         orderFrontRegardless()
 
         updateFlags = [.applicationMenuFrame, .desktopWallpaper]
 
         if !appState.menuBarManager.isMenuBarHiddenBySystem {
+            Logger.overlayPanel.diagnostic("show fade in")
             animator().alphaValue = 1
         }
     }

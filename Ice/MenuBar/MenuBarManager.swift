@@ -135,6 +135,11 @@ final class MenuBarManager: ObservableObject {
                     return
                 }
                 let hidden = options.contains(.hideMenuBar) || options.contains(.autoHideMenuBar)
+                if isMenuBarHiddenBySystem != hidden {
+                    Logger.menuBarManager.diagnostic(
+                        "system presentation hidden=\(hidden) options=\(options.rawValue)"
+                    )
+                }
                 isMenuBarHiddenBySystem = hidden
                 updateAuxiliaryStatusItemCovers()
             }
@@ -404,8 +409,12 @@ final class MenuBarManager: ObservableObject {
 
         let shouldCoverItems = shouldCoverAuxiliaryStatusItems(appState: appState)
         let shouldSuppressVisibleCenteringCovers = !shouldCoverItems && isShowingMenuBarSections
+        Logger.menuBarManager.diagnostic(
+            "aux covers update shouldCover=\(shouldCoverItems) suppressVisibleCentering=\(shouldSuppressVisibleCenteringCovers) coversVisible=\(auxiliaryStatusItemCoversAreVisible) refreshImages=\(refreshImages) deferNew=\(deferNewCovers)"
+        )
         if shouldCoverItems {
             guard canDrawHiddenAuxiliaryStatusItemCovers() else {
+                Logger.menuBarManager.diagnostic("aux covers deferred until hidden menu bar is settled")
                 closeAuxiliaryStatusItemCoverPanels()
                 scheduleAuxiliaryStatusItemCoverUpdate(after: auxiliaryStatusItemCoverRetryDelay)
                 return
@@ -413,6 +422,7 @@ final class MenuBarManager: ObservableObject {
         }
 
         if shouldCoverItems, !auxiliaryStatusItemCoversAreVisible, deferNewCovers {
+            Logger.menuBarManager.diagnostic("aux covers scheduling delayed creation")
             closeAuxiliaryStatusItemCoverPanels()
             scheduleAuxiliaryStatusItemCoverUpdate(after: auxiliaryStatusItemCoverRetryDelay)
             return
@@ -439,10 +449,13 @@ final class MenuBarManager: ObservableObject {
             }
 
         guard !coverContexts.isEmpty else {
+            Logger.menuBarManager.diagnostic("aux covers closing; no cover contexts")
             closeAuxiliaryStatusItemCoverPanels()
             auxiliaryStatusItemCoverTask = nil
             return
         }
+
+        Logger.menuBarManager.diagnostic("aux covers applying count=\(coverContexts.count)")
 
         let itemWindowIDs = Set(coverContexts.map(\.item.windowID))
 

@@ -364,23 +364,36 @@ extension EventManager {
         }
 
         let delay = appState.settingsManager.advancedSettingsManager.showOnHoverDelay
+        Logger.eventManager.diagnostic(
+            "hover check hiddenIsHidden=\(hiddenSection.isHidden) insideMenu=\(isMouseInsideMenuBar) insideEmpty=\(isMouseInsideEmptyMenuBarSpace) insideIceBar=\(isMouseInsideIceBar) mouse=\(diagnosticMouseLocation)"
+        )
 
         Task {
             if hiddenSection.isHidden {
                 guard self.isMouseInsideEmptyMenuBarSpace else {
+                    Logger.eventManager.diagnostic(
+                        "hover show aborted before delay insideMenu=\(self.isMouseInsideMenuBar) insideEmpty=\(self.isMouseInsideEmptyMenuBarSpace) mouse=\(self.diagnosticMouseLocation)"
+                    )
                     return
                 }
                 try? await Task.sleep(for: .seconds(delay))
                 // Make sure the mouse is still inside.
                 guard self.isMouseInsideEmptyMenuBarSpace else {
+                    Logger.eventManager.diagnostic(
+                        "hover show aborted after delay insideMenu=\(self.isMouseInsideMenuBar) insideEmpty=\(self.isMouseInsideEmptyMenuBarSpace) mouse=\(self.diagnosticMouseLocation)"
+                    )
                     return
                 }
+                Logger.eventManager.diagnostic("hover showing hidden section")
                 hiddenSection.show()
             } else {
                 guard
                     !self.isMouseInsideMenuBar,
                     !self.isMouseInsideIceBar
                 else {
+                    Logger.eventManager.diagnostic(
+                        "hover hide aborted before delay insideMenu=\(self.isMouseInsideMenuBar) insideIceBar=\(self.isMouseInsideIceBar) mouse=\(self.diagnosticMouseLocation)"
+                    )
                     return
                 }
                 try? await Task.sleep(for: .seconds(delay))
@@ -389,8 +402,12 @@ extension EventManager {
                     !self.isMouseInsideMenuBar,
                     !self.isMouseInsideIceBar
                 else {
+                    Logger.eventManager.diagnostic(
+                        "hover hide aborted after delay insideMenu=\(self.isMouseInsideMenuBar) insideIceBar=\(self.isMouseInsideIceBar) mouse=\(self.diagnosticMouseLocation)"
+                    )
                     return
                 }
+                Logger.eventManager.diagnostic("hover hiding hidden section")
                 hiddenSection.hide()
             }
         }
@@ -431,6 +448,14 @@ extension EventManager {
 // MARK: - Helpers
 
 extension EventManager {
+    /// The current mouse location formatted for diagnostic logging.
+    private var diagnosticMouseLocation: String {
+        guard let location = MouseCursor.locationCoreGraphics else {
+            return "<nil>"
+        }
+        return "(\(Int(location.x)),\(Int(location.y)))"
+    }
+
     /// Returns the best screen to use for event manager calculations.
     var bestScreen: NSScreen? {
         guard let appState else {

@@ -3,6 +3,7 @@
 //  Ice
 //
 
+import Foundation
 import OSLog
 
 /// A type that encapsulates logging behavior for Ice.
@@ -23,6 +24,14 @@ struct Logger {
     /// Logs the given debug message to the logger.
     func debug(_ message: String) {
         base.debug("\(message, privacy: .public)")
+    }
+
+    /// Logs diagnostic information when explicitly enabled.
+    func diagnostic(_ message: String) {
+        guard UserDefaults.standard.bool(forKey: "_IceMenuBarDiagnostics") else {
+            return
+        }
+        base.info("[diag] \(message, privacy: .public)")
     }
 
     /// Logs the given error message to the logger.
