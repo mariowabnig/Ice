@@ -37,7 +37,7 @@ final class MenuBarManager: ObservableObject {
     /// Panels that cover auxiliary status item windows while the system menu bar is hidden.
     private var auxiliaryStatusItemCoverPanels = [CGWindowID: NSPanel]()
 
-    /// The last visible/hidden state applied to auxiliary status item cover panels.
+    /// The last visible/hidden state resolved for auxiliary status item cover panels.
     private var auxiliaryStatusItemCoversAreVisible = false
 
     /// The last CoreGraphics frames applied to auxiliary status item cover panels.
@@ -435,6 +435,7 @@ final class MenuBarManager: ObservableObject {
         guard !coverContexts.isEmpty else {
             Logger.menuBarManager.diagnostic("aux covers closing; no cover contexts")
             closeAuxiliaryStatusItemCoverPanels()
+            auxiliaryStatusItemCoversAreVisible = shouldCoverItems
             auxiliaryStatusItemCoverTask = nil
             return
         }
