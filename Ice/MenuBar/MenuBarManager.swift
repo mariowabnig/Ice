@@ -72,6 +72,12 @@ final class MenuBarManager: ObservableObject {
         Defaults.globalDomain["_HIHideMenuBar"] as? Bool ?? isMenuBarHiddenBySystemUserDefaults
     }
 
+    /// A Boolean value that indicates whether Ice is currently showing managed
+    /// menu bar sections in the native menu bar.
+    private var isShowingMenuBarSections: Bool {
+        sections.contains { $0.controlItem.state == .showItems }
+    }
+
     /// A visual mode for an auxiliary status item cover panel.
     private enum AuxiliaryStatusItemCoverMode: Equatable {
         /// Hide the item while the system menu bar is retracted.
@@ -397,6 +403,7 @@ final class MenuBarManager: ObservableObject {
         }
 
         let shouldCoverItems = shouldCoverAuxiliaryStatusItems(appState: appState)
+        let shouldSuppressVisibleCenteringCovers = !shouldCoverItems && isShowingMenuBarSections
         if shouldCoverItems {
             guard canDrawHiddenAuxiliaryStatusItemCovers() else {
                 closeAuxiliaryStatusItemCoverPanels()
@@ -421,6 +428,9 @@ final class MenuBarManager: ObservableObject {
             .compactMap { item -> (item: MenuBarItem, frame: CGRect, mode: AuxiliaryStatusItemCoverMode)? in
                 if shouldCoverItems {
                     return (item, item.frame, .hide)
+                }
+                guard !shouldSuppressVisibleCenteringCovers else {
+                    return nil
                 }
                 guard let centeringFrame = auxiliaryStatusItemCenteringCoverFrame(for: item) else {
                     return nil
