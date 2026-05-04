@@ -52,6 +52,10 @@ final class ControlItem {
     /// is reserving space for them.
     private let auxiliaryStatusItemPadding: CGFloat = 6
 
+    /// Extra first-pass clearance used before AppKit reports the divider frame
+    /// that the settled reservation calculation normally uses.
+    private let auxiliaryStatusItemFallbackPaddingMultiplier: CGFloat = 3
+
     /// Auxiliary status item frames captured while the hidden section is hidden.
     private var auxiliaryStatusItemReservationFrames = [CGRect]()
 
@@ -369,7 +373,7 @@ final class ControlItem {
             auxiliaryFrames.filter { abs($0.minY) <= 2 }
         }
         let fallbackReservedLength = rowAuxiliaryFrames
-            .map { $0.width + (auxiliaryStatusItemPadding * 2) }
+            .map { $0.width + (auxiliaryStatusItemPadding * auxiliaryStatusItemFallbackPaddingMultiplier) }
             .max() ?? 0
         guard let dividerFrame else {
             return cachedAuxiliaryStatusItemReservationLength(max(0, fallbackReservedLength - Lengths.standard))

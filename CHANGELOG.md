@@ -20,7 +20,7 @@ All notable changes to Ice are tracked here retroactively from the available git
 - Hidden-section reveal now falls back to reserving the full auxiliary overlay width when the divider frame is temporarily unavailable or outside the overlay during the first reveal layout pass.
 - Hidden-section reveal now keeps the last valid auxiliary spacer through transient layout passes and uses a direct WindowServer fallback for app-owned status-level windows, reducing Portworth overlap during the reveal animation.
 - Hidden-section reveal now primes the auxiliary spacer while the section is hidden and keeps that spacer from shrinking until the section hides again, reducing flicker while native items animate into place beside Portworth.
-- Hidden-section reveal now includes the auxiliary spacer's right-side padding in the first fallback reservation, reducing the final one-step settle when hidden items first appear beside Portworth.
+- Hidden-section reveal now includes the auxiliary spacer's full first-pass clearance in the fallback reservation, reducing the final one-step settle when hidden items first appear beside Portworth.
 - Auxiliary status item reservation now preserves every auxiliary frame instead of collapsing windows with the same simplified identity.
 - Ice Bar and Menu Bar Layout render auxiliary status item captures with transparent horizontal padding trimmed, so wide transparent app-owned windows do not appear oddly offset inside Ice's UI.
 - Hidden-section hide/show updates now use the hiding state currently being applied when computing divider visibility and auxiliary reservation length.
