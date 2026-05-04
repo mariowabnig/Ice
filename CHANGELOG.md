@@ -15,6 +15,11 @@ All notable changes to Ice are tracked here retroactively from the available git
 - Auxiliary status item covers now cache and refresh their images only when needed, reducing flicker and avoiding unnecessary screen captures during pointer movement.
 - Auxiliary status item covers now redraw shorter top-pinned auxiliary windows centered in the visible menu bar while still passing mouse events through to the owning app.
 - Hidden-section reveal now reserves space from auxiliary status item frames captured while the hidden section is hidden, preventing native hidden items from sliding underneath app-owned overlays.
+- Hidden-section reveal now also merges in live on-screen auxiliary status item frames when computing its reservation, so app-owned overlays such as Portworth are protected even if the cached visible-section list is stale during the reveal.
+- Hidden-section reveal now reserves across the full auxiliary overlay frame when the divider frame lands inside that overlay, preventing newly revealed native items from flickering behind narrow app-owned windows such as Portworth's dot.
+- Hidden-section reveal now falls back to reserving the full auxiliary overlay width when the divider frame is temporarily unavailable or outside the overlay during the first reveal layout pass.
+- Hidden-section reveal now keeps the last valid auxiliary spacer through transient layout passes and uses a direct WindowServer fallback for app-owned status-level windows, reducing Portworth overlap during the reveal animation.
+- Hidden-section reveal now primes the auxiliary spacer while the section is hidden and keeps that spacer from shrinking until the section hides again, reducing flicker while native items animate into place beside Portworth.
 - Auxiliary status item reservation now preserves every auxiliary frame instead of collapsing windows with the same simplified identity.
 - Ice Bar and Menu Bar Layout render auxiliary status item captures with transparent horizontal padding trimmed, so wide transparent app-owned windows do not appear oddly offset inside Ice's UI.
 - Hidden-section hide/show updates now use the hiding state currently being applied when computing divider visibility and auxiliary reservation length.

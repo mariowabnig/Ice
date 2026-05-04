@@ -55,6 +55,9 @@ final class ControlItem {
     /// Auxiliary status item frames captured while the hidden section is hidden.
     private var auxiliaryStatusItemReservationFrames = [CGRect]()
 
+    /// Last nonzero hidden-section reservation for auxiliary status item windows.
+    private var auxiliaryStatusItemReservationLengthCache: CGFloat = 0
+
     /// Storage for internal observers.
     private var cancellables = Set<AnyCancellable>()
 
@@ -342,9 +345,9 @@ final class ControlItem {
             return
         }
 
-        auxiliaryStatusItemReservationFrames = items
-            .filter(\.isAuxiliaryStatusItem)
-            .map(\.frame)
+        auxiliaryStatusItemReservationFrames = auxiliaryStatusItemFrames(from: items, includeCachedFrames: false)
+        auxiliaryStatusItemReservationLengthCache = 0
+        _ = auxiliaryStatusItemReservationLength(for: .showItems)
     }
 
     /// Returns extra length needed to keep auxiliary status windows clear when
@@ -353,37 +356,116 @@ final class ControlItem {
         guard
             identifier == .hidden,
             (state ?? self.state) == .showItems,
-            let appState,
-            let dividerFrame = windowID.flatMap(WindowInfo.init(windowID:))?.frame ?? windowFrame ?? window?.frame
+            let appState
         else {
             return 0
         }
 
-        let auxiliaryFrames = if auxiliaryStatusItemReservationFrames.isEmpty {
-            appState.itemManager.itemCache[.visible]
-                .filter(\.isAuxiliaryStatusItem)
-                .map(\.frame)
+        let auxiliaryFrames = auxiliaryStatusItemFrames(from: appState.itemManager.itemCache[.visible])
+        let dividerFrame = windowID.flatMap(WindowInfo.init(windowID:))?.frame ?? windowFrame ?? window?.frame
+        let rowAuxiliaryFrames = if let dividerFrame {
+            auxiliaryFrames.filter { abs($0.minY - dividerFrame.minY) <= 2 }
         } else {
-            auxiliaryStatusItemReservationFrames
+            auxiliaryFrames.filter { abs($0.minY) <= 2 }
+        }
+        let fallbackReservedLength = rowAuxiliaryFrames
+            .map { $0.width + auxiliaryStatusItemPadding }
+            .max() ?? 0
+        guard let dividerFrame else {
+            return cachedAuxiliaryStatusItemReservationLength(max(0, fallbackReservedLength - Lengths.standard))
         }
 
-        guard let leftmostAuxiliaryItemMinX = auxiliaryFrames
-            .filter({
-                abs($0.minY - dividerFrame.minY) <= 2 &&
-                $0.minX < dividerFrame.maxX
-            })
-            .map(\.minX)
-            .min()
+        let relevantAuxiliaryFrames = rowAuxiliaryFrames.filter {
+            $0.minX < dividerFrame.maxX + auxiliaryStatusItemPadding
+        }
+        guard
+            let leftmostAuxiliaryItemMinX = relevantAuxiliaryFrames.map(\.minX).min(),
+            let rightmostReservedMaxX = relevantAuxiliaryFrames.map({ max($0.maxX, dividerFrame.maxX) }).max()
         else {
-            return 0
+            return cachedAuxiliaryStatusItemReservationLength(max(0, fallbackReservedLength - Lengths.standard))
         }
 
-        let reservedLength = dividerFrame.maxX - leftmostAuxiliaryItemMinX + auxiliaryStatusItemPadding
-        return max(0, reservedLength - Lengths.standard)
+        let reservedLength = max(
+            rightmostReservedMaxX - leftmostAuxiliaryItemMinX + auxiliaryStatusItemPadding,
+            fallbackReservedLength
+        )
+        return cachedAuxiliaryStatusItemReservationLength(max(0, reservedLength - Lengths.standard))
+    }
+
+    /// Returns the current reservation or the last nonzero one during transient menu bar layout.
+    private func cachedAuxiliaryStatusItemReservationLength(_ length: CGFloat) -> CGFloat {
+        if length > 0 {
+            auxiliaryStatusItemReservationLengthCache = max(auxiliaryStatusItemReservationLengthCache, length)
+            return auxiliaryStatusItemReservationLengthCache
+        }
+
+        return auxiliaryStatusItemReservationFrames.isEmpty ? 0 : auxiliaryStatusItemReservationLengthCache
+    }
+
+    /// Returns cached auxiliary frames plus a live on-screen fallback.
+    private func auxiliaryStatusItemFrames(from items: [MenuBarItem], includeCachedFrames: Bool = true) -> [CGRect] {
+        let cachedFrames = includeCachedFrames ? auxiliaryStatusItemReservationFrames : []
+        let itemFrames = items
+            .filter(\.isAuxiliaryStatusItem)
+            .map(\.frame)
+        let liveFrames = MenuBarItem
+            .getMenuBarItems(onScreenOnly: true, activeSpaceOnly: false)
+            .filter(\.isAuxiliaryStatusItem)
+            .map(\.frame)
+        let liveWindowFrames = WindowInfo
+            .getOnScreenWindows(excludeDesktopWindows: true)
+            .filter(isAuxiliaryStatusItemWindowFallback)
+            .map(\.frame)
+        return (cachedFrames + itemFrames + liveFrames + liveWindowFrames).reduce(into: []) { frames, frame in
+            guard !frames.contains(where: { existingFrame in
+                abs(existingFrame.minX - frame.minX) < 1 &&
+                abs(existingFrame.minY - frame.minY) < 1 &&
+                abs(existingFrame.width - frame.width) < 1 &&
+                abs(existingFrame.height - frame.height) < 1
+            }) else {
+                return
+            }
+            frames.append(frame)
+        }
+    }
+
+    /// A direct WindowServer fallback for auxiliary app-owned status windows.
+    private func isAuxiliaryStatusItemWindowFallback(_ window: WindowInfo) -> Bool {
+        guard
+            window.isMenuBarItem,
+            window.isOnScreen,
+            window.alpha > 0,
+            window.frame.height <= auxiliaryStatusItemMaxHeight(for: window)
+        else {
+            return false
+        }
+
+        guard let ownerName = window.ownerName, !ownerName.isEmpty else {
+            return false
+        }
+
+        let excludedOwnerNames = Set([
+            "Control Center",
+            "Kontrollzentrum",
+            "Dock",
+            "SystemUIServer",
+            "Window Server",
+        ])
+        return !excludedOwnerNames.contains(ownerName)
+    }
+
+    /// Returns the tallest expected status item height for the window's screen.
+    private func auxiliaryStatusItemMaxHeight(for window: WindowInfo) -> CGFloat {
+        let screen = NSScreen.screens.first { CGDisplayBounds($0.displayID).intersects(window.frame) }
+        let menuBarHeight = screen?.getMenuBarHeight() ?? NSStatusBar.system.thickness
+        return max(menuBarHeight, NSStatusBar.system.thickness) + 10
     }
 
     /// Updates the status item's length based on its section state.
-    private func updateStatusItemLength(for state: HidingState? = nil) {
+    private func updateStatusItemLength(
+        for state: HidingState? = nil,
+        auxiliaryStatusItemReservationLength: CGFloat? = nil
+    ) {
         guard let section else {
             return
         }
@@ -398,7 +480,9 @@ final class ControlItem {
             case .hideItems:
                 Lengths.expanded
             case .showItems:
-                Lengths.standard + auxiliaryStatusItemReservationLength(for: state)
+                Lengths.standard + (
+                    auxiliaryStatusItemReservationLength ?? self.auxiliaryStatusItemReservationLength(for: state)
+                )
             }
         case .alwaysHidden:
             switch state {
@@ -524,7 +608,8 @@ final class ControlItem {
                 updateStatusItemLength(for: state)
             case .showItems:
                 let showSectionDividers = appState.settingsManager.advancedSettingsManager.showSectionDividers
-                let shouldReserveAuxiliaryItemSpace = section.name == .hidden && auxiliaryStatusItemReservationLength(for: state) > 0
+                let reservationLength = section.name == .hidden ? auxiliaryStatusItemReservationLength(for: state) : 0
+                let shouldReserveAuxiliaryItemSpace = reservationLength > 0
                 setVisible(showSectionDividers || shouldReserveAuxiliaryItemSpace)
                 // Enable the cell, as it may have been previously disabled.
                 button.cell?.isEnabled = true
@@ -540,7 +625,7 @@ final class ControlItem {
                 } else {
                     button.image = nil
                 }
-                updateStatusItemLength(for: state)
+                updateStatusItemLength(for: state, auxiliaryStatusItemReservationLength: reservationLength)
             }
         }
     }
