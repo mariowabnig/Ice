@@ -369,7 +369,7 @@ final class ControlItem {
             auxiliaryFrames.filter { abs($0.minY) <= 2 }
         }
         let fallbackReservedLength = rowAuxiliaryFrames
-            .map { $0.width + auxiliaryStatusItemPadding }
+            .map { $0.width + (auxiliaryStatusItemPadding * 2) }
             .max() ?? 0
         guard let dividerFrame else {
             return cachedAuxiliaryStatusItemReservationLength(max(0, fallbackReservedLength - Lengths.standard))
