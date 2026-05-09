@@ -71,6 +71,9 @@ final class MenuBarSection {
         }
     }
 
+    /// The delay before revealing native items after Ice activates to hide app menus.
+    private let nativeRevealDelayAfterApplicationMenuHide: Duration = .milliseconds(250)
+
     /// A Boolean value that indicates whether the section is hidden.
     var isHidden: Bool {
         if useIceBar {
@@ -167,15 +170,23 @@ final class MenuBarSection {
             guard let hiddenSection = appState.menuBarManager.section(withName: .hidden) else {
                 return
             }
-            controlItem.state = .showItems
-            hiddenSection.controlItem.state = .showItems
+            let shouldDelayReveal = appState.menuBarManager.prepareApplicationMenusForNativeSectionReveal()
+            revealNativeSection(afterApplicationMenuHide: shouldDelayReveal) {
+                self.controlItem.state = .showItems
+                hiddenSection.controlItem.state = .showItems
+            }
+            return
         case .hidden:
             iceBarPanel?.close()
             guard let visibleSection = appState.menuBarManager.section(withName: .visible) else {
                 return
             }
-            controlItem.state = .showItems
-            visibleSection.controlItem.state = .showItems
+            let shouldDelayReveal = appState.menuBarManager.prepareApplicationMenusForNativeSectionReveal()
+            revealNativeSection(afterApplicationMenuHide: shouldDelayReveal) {
+                self.controlItem.state = .showItems
+                visibleSection.controlItem.state = .showItems
+            }
+            return
         case .alwaysHidden:
             iceBarPanel?.close()
             guard
@@ -184,11 +195,32 @@ final class MenuBarSection {
             else {
                 return
             }
-            controlItem.state = .showItems
-            hiddenSection.controlItem.state = .showItems
-            visibleSection.controlItem.state = .showItems
+            let shouldDelayReveal = appState.menuBarManager.prepareApplicationMenusForNativeSectionReveal()
+            revealNativeSection(afterApplicationMenuHide: shouldDelayReveal) {
+                self.controlItem.state = .showItems
+                hiddenSection.controlItem.state = .showItems
+                visibleSection.controlItem.state = .showItems
+            }
+            return
         }
         startRehideChecks()
+    }
+
+    /// Reveals native menu bar items after allowing app menu hiding to settle.
+    private func revealNativeSection(
+        afterApplicationMenuHide shouldDelayReveal: Bool,
+        _ reveal: @escaping @MainActor () -> Void
+    ) {
+        if shouldDelayReveal {
+            Task { @MainActor in
+                try? await Task.sleep(for: nativeRevealDelayAfterApplicationMenuHide)
+                reveal()
+                startRehideChecks()
+            }
+        } else {
+            reveal()
+            startRehideChecks()
+        }
     }
 
     /// Hides the section.

@@ -78,6 +78,19 @@ final class MenuBarManager: ObservableObject {
         sections.contains { $0.controlItem.state == .showItems }
     }
 
+    /// A Boolean value that indicates whether Ice is allowed to hide app menus
+    /// while revealing native menu bar sections.
+    private var canHideApplicationMenusForNativeSectionReveal: Bool {
+        guard let appState else {
+            return false
+        }
+        return
+            appState.settingsManager.advancedSettingsManager.hideApplicationMenus &&
+            !isMenuBarHiddenBySystem &&
+            !appState.isActiveSpaceFullscreen &&
+            appState.settingsWindow?.isVisible != true
+    }
+
     /// A visual mode for an auxiliary status item cover panel.
     private enum AuxiliaryStatusItemCoverMode: Equatable {
         /// Hide the item while the system menu bar is retracted.
@@ -264,7 +277,7 @@ final class MenuBarManager: ObservableObject {
                     appState.settingsManager.advancedSettingsManager.hideApplicationMenus,
                     !isMenuBarHiddenBySystem,
                     !appState.isActiveSpaceFullscreen,
-                    appState.settingsWindow?.isVisible == false
+                    appState.settingsWindow?.isVisible != true
                 else {
                     return
                 }
@@ -318,6 +331,20 @@ final class MenuBarManager: ObservableObject {
             .store(in: &c)
 
         cancellables = c
+    }
+
+    /// Hides application menus before a native section reveal.
+    @discardableResult
+    func prepareApplicationMenusForNativeSectionReveal() -> Bool {
+        guard
+            canHideApplicationMenusForNativeSectionReveal,
+            !isHidingApplicationMenus
+        else {
+            return false
+        }
+
+        hideApplicationMenus()
+        return true
     }
 
     /// Updates whether UserDefaults says the system menu bar should hide.
