@@ -12,6 +12,8 @@ All notable changes to Ice are tracked here retroactively from the available git
 - Added visual cover panels for auxiliary status-level windows while the system menu bar is retracted, so app-owned status windows do not linger on the desktop.
 
 ### Changed
+- The GitHub Actions app artifact workflow now also runs on pushes to `main`, keeping the artifact install fallback fresh after shipped changes.
+- `build-and-install.sh` now falls back to the latest successful GitHub Actions app artifact when full local Xcode is unavailable, then still installs and re-signs the app with the stable local identity.
 - Local development signing now trims the default login keychain path before importing the self-signed identity, so stable local signing works with `security default-keychain` output that includes leading whitespace.
 - Local development signing now exports the temporary PKCS#12 with a non-empty local password, matching what macOS `security import` expects.
 - Local development installs now create and reuse a stable self-signed `Ice Local Development` code-signing identity when possible, so Accessibility approval survives normal rebuild/reinstall cycles instead of changing with every ad-hoc build hash.

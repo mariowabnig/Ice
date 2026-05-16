@@ -3,11 +3,21 @@ set -euo pipefail
 
 SIGNING_IDENTITY_NAME="Ice Local Development"
 SIGNING_IDENTITY="-"
+INSTALL_APP_PATH=""
+ARTIFACT_TMPDIR=""
 LOGIN_KEYCHAIN="$(
   security default-keychain -d user 2>/dev/null |
     sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e 's/^"//' -e 's/"$//' || true
 )"
 LOGIN_KEYCHAIN="${LOGIN_KEYCHAIN:-${HOME}/Library/Keychains/login.keychain-db}"
+
+cleanup_artifact_tmpdir() {
+  if [[ -n "$ARTIFACT_TMPDIR" && -d "$ARTIFACT_TMPDIR" ]]; then
+    rm -rf "$ARTIFACT_TMPDIR"
+  fi
+}
+
+trap cleanup_artifact_tmpdir EXIT
 
 find_local_signing_identity() {
   security find-identity -v -p codesigning 2>/dev/null |
@@ -120,26 +130,97 @@ codesign_installed_app() {
   sign_installed_app_with_identity "$SIGNING_IDENTITY"
 }
 
-require_xcodebuild() {
-  if xcodebuild -version >/dev/null 2>&1; then
+xcodebuild_available() {
+  xcodebuild -version >/dev/null 2>&1
+}
+
+build_local_app() {
+  echo "=== Building Ice ==="
+  xcodebuild -project Ice.xcodeproj -scheme Ice -configuration Release \
+    -derivedDataPath build \
+    CODE_SIGN_IDENTITY="-" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=YES DEVELOPMENT_TEAM="" \
+    DEBUG_INFORMATION_FORMAT=dwarf \
+    build 2>&1 | tail -3
+  INSTALL_APP_PATH="build/Build/Products/Release/Ice.app"
+}
+
+download_artifact_app() {
+  local repo="${ICE_ARTIFACT_REPO:-mariowabnig/Ice}"
+  local workflow="${ICE_ARTIFACT_WORKFLOW:-build-artifact.yml}"
+  local branch="${ICE_ARTIFACT_BRANCH:-main}"
+  local artifact_name="${ICE_ARTIFACT_NAME:-Ice-app}"
+  local run_id="${ICE_ARTIFACT_RUN_ID:-}"
+
+  echo "=== Fetching Ice artifact ==="
+  if ! command -v gh >/dev/null 2>&1; then
+    echo "  ERROR: Full Xcode is unavailable and GitHub CLI (gh) is not installed."
+    echo "  Install Xcode for local builds, or install/authenticate gh for artifact installs."
+    exit 1
+  fi
+
+  if [[ -z "$run_id" ]]; then
+    run_id="$(
+      gh run list \
+        --repo "$repo" \
+        --workflow "$workflow" \
+        --branch "$branch" \
+        --status success \
+        --limit 1 \
+        --json databaseId \
+        --jq '.[0].databaseId'
+    )"
+  fi
+
+  if [[ -z "$run_id" || "$run_id" == "null" ]]; then
+    echo "  ERROR: No successful ${workflow} run found on ${repo}/${branch}."
+    echo "  Trigger the workflow once, or set ICE_ARTIFACT_RUN_ID to a known good run."
+    exit 1
+  fi
+
+  ARTIFACT_TMPDIR="$(mktemp -d)"
+  local download_dir="$ARTIFACT_TMPDIR/download"
+  local app_dir="$ARTIFACT_TMPDIR/app"
+  mkdir -p "$download_dir" "$app_dir"
+
+  gh run download "$run_id" \
+    --repo "$repo" \
+    --name "$artifact_name" \
+    --dir "$download_dir"
+
+  local zip_path="$download_dir/Ice.app.zip"
+  if [[ ! -f "$zip_path" ]]; then
+    zip_path="$(find "$download_dir" -name "*.zip" -print | head -n 1)"
+  fi
+  if [[ -z "$zip_path" || ! -f "$zip_path" ]]; then
+    echo "  ERROR: Downloaded artifact did not contain Ice.app.zip."
+    exit 1
+  fi
+
+  ditto -x -k "$zip_path" "$app_dir"
+  if [[ ! -d "$app_dir/Ice.app" ]]; then
+    echo "  ERROR: Downloaded artifact did not unpack to Ice.app."
+    exit 1
+  fi
+
+  INSTALL_APP_PATH="$app_dir/Ice.app"
+  echo "  Using artifact ${artifact_name} from run ${run_id}."
+}
+
+prepare_install_source() {
+  if xcodebuild_available; then
+    build_local_app
     return
   fi
 
   local developer_dir
   developer_dir="$(xcode-select -p 2>/dev/null || true)"
-  echo "  ERROR: Ice requires full Xcode to build."
+  echo "  Full Xcode is not available locally."
   echo "  Current developer directory: ${developer_dir:-not set}"
-  echo "  Install Xcode, then run: sudo xcode-select -s /Applications/Xcode.app/Contents/Developer"
-  exit 1
+  echo "  Falling back to the latest GitHub Actions app artifact."
+  download_artifact_app
 }
 
-echo "=== Building Ice ==="
-require_xcodebuild
-xcodebuild -project Ice.xcodeproj -scheme Ice -configuration Release \
-  -derivedDataPath build \
-  CODE_SIGN_IDENTITY="-" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=YES DEVELOPMENT_TEAM="" \
-  DEBUG_INFORMATION_FORMAT=dwarf \
-  build 2>&1 | tail -3
+prepare_install_source
 
 echo "=== Preparing signing identity ==="
 resolve_signing_identity
@@ -150,7 +231,7 @@ sleep 1
 
 echo "=== Installing ==="
 rm -rf /Applications/Ice.app
-cp -R build/Build/Products/Release/Ice.app /Applications/Ice.app
+cp -R "$INSTALL_APP_PATH" /Applications/Ice.app
 codesign_installed_app
 
 echo "=== Launching ==="
