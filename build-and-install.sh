@@ -3,7 +3,10 @@ set -euo pipefail
 
 SIGNING_IDENTITY_NAME="Ice Local Development"
 SIGNING_IDENTITY="-"
-LOGIN_KEYCHAIN="$(security default-keychain -d user 2>/dev/null | tr -d '"' || true)"
+LOGIN_KEYCHAIN="$(
+  security default-keychain -d user 2>/dev/null |
+    sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e 's/^"//' -e 's/"$//' || true
+)"
 LOGIN_KEYCHAIN="${LOGIN_KEYCHAIN:-${HOME}/Library/Keychains/login.keychain-db}"
 
 find_local_signing_identity() {
@@ -28,6 +31,7 @@ create_local_signing_identity() {
   local key_path="$tmpdir/ice-local-dev.key"
   local cert_path="$tmpdir/ice-local-dev.crt"
   local p12_path="$tmpdir/ice-local-dev.p12"
+  local p12_password="ice-local-development"
 
   openssl req \
     -x509 \
@@ -47,11 +51,11 @@ create_local_signing_identity() {
     -in "$cert_path" \
     -out "$p12_path" \
     -name "$SIGNING_IDENTITY_NAME" \
-    -passout pass: >/dev/null 2>&1 || cleanup_and_fail "$tmpdir"
+    -passout pass:"$p12_password" >/dev/null 2>&1 || cleanup_and_fail "$tmpdir"
 
   security import "$p12_path" \
     -k "$LOGIN_KEYCHAIN" \
-    -P "" \
+    -P "$p12_password" \
     -T /usr/bin/codesign >/dev/null 2>&1 || cleanup_and_fail "$tmpdir"
 
   if ! security add-trusted-cert \
