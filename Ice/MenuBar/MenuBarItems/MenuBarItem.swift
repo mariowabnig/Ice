@@ -144,6 +144,13 @@ struct MenuBarItem {
         return Self.hasAuxiliaryStatusItemIdentity(window: window)
     }
 
+    /// A Boolean value that indicates whether the auxiliary item follows Ice's
+    /// read-only overlay contract: the window title starts with the owning app's
+    /// bundle identifier, or its dashed form.
+    var isBundleIdentifiedAuxiliaryStatusItem: Bool {
+        Self.hasBundleIdentifiedAuxiliaryStatusItemIdentity(window: window)
+    }
+
     /// A string to use for logging purposes.
     var logString: String {
         String(describing: info)
@@ -234,13 +241,8 @@ extension MenuBarItem {
     }
 
     private static func hasAuxiliaryStatusItemIdentity(window: WindowInfo) -> Bool {
-        if
-            let title = window.title,
-            !title.isEmpty,
-            let bundleIdentifier = window.owningApplication?.bundleIdentifier
-        {
-            let dashedBundleIdentifier = bundleIdentifier.replacingOccurrences(of: ".", with: "-")
-            return title.hasPrefix(bundleIdentifier) || title.hasPrefix(dashedBundleIdentifier)
+        if hasBundleIdentifiedAuxiliaryStatusItemIdentity(window: window) {
+            return true
         }
 
         // Scripted or helper-driven menu bar apps can expose status-level windows
@@ -258,6 +260,19 @@ extension MenuBarItem {
             "Window Server",
         ])
         return !excludedOwnerNames.contains(ownerName)
+    }
+
+    private static func hasBundleIdentifiedAuxiliaryStatusItemIdentity(window: WindowInfo) -> Bool {
+        if
+            let title = window.title,
+            !title.isEmpty,
+            let bundleIdentifier = window.owningApplication?.bundleIdentifier
+        {
+            let dashedBundleIdentifier = bundleIdentifier.replacingOccurrences(of: ".", with: "-")
+            return title.hasPrefix(bundleIdentifier) || title.hasPrefix(dashedBundleIdentifier)
+        }
+
+        return false
     }
 
     private static func getAuxiliaryStatusItems(

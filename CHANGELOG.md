@@ -12,6 +12,8 @@ All notable changes to Ice are tracked here retroactively from the available git
 - Added visual cover panels for auxiliary status-level windows while the system menu bar is retracted, so app-owned status windows do not linger on the desktop.
 
 ### Changed
+- Local development installs now create and reuse a stable self-signed `Ice Local Development` code-signing identity when possible, so Accessibility approval survives normal rebuild/reinstall cycles instead of changing with every ad-hoc build hash.
+- Bundle-identified auxiliary status windows now follow a read-only overlay contract: Ice keeps discovering them as menu bar layout items and spacing obstacles, but no longer creates visual cover or centering panels for them because the owning app is responsible for visibility and alignment.
 - Auxiliary status item covers now cache and refresh their images only when needed, reducing flicker and avoiding unnecessary screen captures during pointer movement.
 - Auxiliary status item covers now redraw shorter top-pinned auxiliary windows centered in the visible menu bar while still passing mouse events through to the owning app.
 - Hidden-section reveal now reserves space from auxiliary status item frames captured while the hidden section is hidden, preventing native hidden items from sliding underneath app-owned overlays.

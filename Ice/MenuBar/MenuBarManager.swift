@@ -428,7 +428,7 @@ final class MenuBarManager: ObservableObject {
         }
 
         let coverContexts = MenuBarItem.getMenuBarItems(onScreenOnly: true, activeSpaceOnly: true)
-            .filter(\.isAuxiliaryStatusItem)
+            .filter { $0.isAuxiliaryStatusItem && !$0.isBundleIdentifiedAuxiliaryStatusItem }
             .compactMap { item -> (item: MenuBarItem, frame: CGRect, mode: AuxiliaryStatusItemCoverMode)? in
                 if shouldCoverItems {
                     return (item, item.frame, .hide)
