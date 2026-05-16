@@ -13,6 +13,7 @@ All notable changes to Ice are tracked here retroactively from the available git
 
 ### Changed
 - The GitHub Actions app artifact workflow now also runs on pushes to `main`, keeping the artifact install fallback fresh after shipped changes.
+- The app artifact workflow now uses current major versions of the GitHub checkout and artifact upload actions to avoid the Node 20 actions deprecation path.
 - `build-and-install.sh` now falls back to the latest successful GitHub Actions app artifact when full local Xcode is unavailable, then still installs and re-signs the app with the stable local identity.
 - Local development signing now trims the default login keychain path before importing the self-signed identity, so stable local signing works with `security default-keychain` output that includes leading whitespace.
 - Local development signing now exports the temporary PKCS#12 with a non-empty local password, matching what macOS `security import` expects.
