@@ -38,6 +38,7 @@ All notable changes to Ice are tracked here retroactively from the available git
 - Fixed startup behavior where items assigned to the Hidden Section could still appear in the native menu bar because the hidden spacer length was not reapplied.
 - Fixed hidden section hide transitions that could leave items visible after clicking Hide.
 - Fixed visible auxiliary status item cover flicker while expanded sections are shown in automatically hidden menu bars.
+- Fixed auto-hidden menu bars immediately rehiding after the Show All control is clicked while the pointer is still in the revealed menu-bar strip.
 - Fixed auto-hidden menu bar hit testing so visible status item windows keep expanded sections from rehiding during the system reveal animation.
 - Fixed a no-item auxiliary cover retry loop that could churn while the menu bar was hidden.
 - Fixed delayed auxiliary status item reveal with auto-hidden menu bars by falling back to the top-edge reveal band when the transient menu bar window frame does not yet contain the pointer.

@@ -181,10 +181,12 @@ final class MenuBarManager: ObservableObject {
                 .sink { [weak self, weak window] _ in
                     guard
                         let self,
+                        let appState,
                         isMenuBarHiddenBySystemUserDefaults,
                         let info = window.flatMap({ Bridging.getCGWindowID(for: $0).flatMap { WindowInfo(windowID: $0) } }),
                         !info.isOnScreen,
-                        sections.contains(where: { !$0.isHidden })
+                        sections.contains(where: { !$0.isHidden }),
+                        !appState.eventManager.isMouseInsideMenuBar
                     else {
                         return
                     }
