@@ -72,6 +72,24 @@ final class MenuBarManager: ObservableObject {
         Defaults.globalDomain["_HIHideMenuBar"] as? Bool ?? isMenuBarHiddenBySystemUserDefaults
     }
 
+    /// A Boolean value that indicates whether the pointer is inside any screen's
+    /// menu bar area, including a revealed auto-hidden menu bar.
+    private var isMouseInsideAnyMenuBarArea: Bool {
+        let appKitMouseLocation = NSEvent.mouseLocation
+        if NSScreen.screens.contains(where: { $0.containsAppKitMenuBarPoint(appKitMouseLocation) }) {
+            return true
+        }
+
+        guard let coreGraphicsMouseLocation = MouseCursor.locationCoreGraphics else {
+            return false
+        }
+
+        let windows = WindowInfo.getOnScreenWindows(excludeDesktopWindows: true)
+        return NSScreen.screens.contains { screen in
+            WindowInfo.getMenuBarWindow(from: windows, for: screen.displayID)?.frame.contains(coreGraphicsMouseLocation) == true
+        }
+    }
+
     /// A Boolean value that indicates whether Ice is currently showing managed
     /// menu bar sections in the native menu bar.
     private var isShowingMenuBarSections: Bool {
@@ -181,12 +199,11 @@ final class MenuBarManager: ObservableObject {
                 .sink { [weak self, weak window] _ in
                     guard
                         let self,
-                        let appState,
                         isMenuBarHiddenBySystemUserDefaults,
                         let info = window.flatMap({ Bridging.getCGWindowID(for: $0).flatMap { WindowInfo(windowID: $0) } }),
                         !info.isOnScreen,
                         sections.contains(where: { !$0.isHidden }),
-                        !appState.eventManager.isMouseInsideMenuBar
+                        !isMouseInsideAnyMenuBarArea
                     else {
                         return
                     }
