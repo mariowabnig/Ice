@@ -51,6 +51,7 @@ All notable changes to Ice are tracked here retroactively from the available git
 - Fixed macOS 26 compatibility where status item ownership and menu bar window behavior changed.
 
 ### Documentation
+- Added a root architecture guide for app startup, manager boundaries, permissions, private API touchpoints, and verification.
 - Documented the control-item startup ordering and status item length requirements that keep hidden items offscreen.
 - Documented auxiliary status item behavior, Portworth centering integration notes, auto-hidden menu bar limitations, and local install permission behavior in `FREQUENT_ISSUES.md`.
 - Documented automatically hidden menu bar support and auxiliary status-level item behavior in `README.md`.

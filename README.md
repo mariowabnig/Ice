@@ -19,6 +19,8 @@ Ice is a powerful menu bar management tool. While its primary function is hiding
 
 Release history is tracked in [CHANGELOG.md](CHANGELOG.md).
 
+Architecture and contributor notes are tracked in [ARCHITECTURE.md](ARCHITECTURE.md).
+
 <a href="https://www.buymeacoffee.com/jordanbaird" target="_blank">
     <img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" style="height: 60px !important;width: 217px !important;">
 </a>

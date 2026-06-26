@@ -7,10 +7,13 @@ This repository is prepared for both Codex and Claude Code. Keep durable project
 
 ### Start Here
 - [README.md](README.md) — README.
+- [ARCHITECTURE.md](ARCHITECTURE.md) — architecture, system boundaries, and verification.
 - [docs/AGENT_GUIDE.md](docs/AGENT_GUIDE.md) — agent guide.
 
 ### Common Commands
 - Xcode project: inspect schemes with `xcodebuild -list -project Ice.xcodeproj` before building.
+- Debug build after confirming the scheme: `xcodebuild -project Ice.xcodeproj -scheme Ice -configuration Debug build`.
+- Use a full Xcode installation; Command Line Tools alone are not enough for normal project builds.
 
 ### Working Rules
 - Keep changes small, reviewable, and tied to the requested behavior.
@@ -23,4 +26,7 @@ This repository is prepared for both Codex and Claude Code. Keep durable project
 
 ## Notes
 
-Add project-specific architecture, testing, release, and safety rules above or in linked docs as they become stable. Keep this file concise enough to fit comfortably in agent context.
+- This app touches menu bar internals, Accessibility, Screen Recording, CoreGraphics windows, event monitoring, and private bridging APIs. Keep changes narrow and verify manually when touching those paths.
+- `AppState` owns the long-lived managers; avoid creating parallel global state.
+- Persist settings through `Defaults.Key` and add migrations when stored values change.
+- Test both missing-permission and granted-permission launch paths when changing startup or permissions code.
