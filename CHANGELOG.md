@@ -5,6 +5,7 @@ All notable changes to Ice are tracked here retroactively from the available git
 ## Unreleased
 
 ### Added
+- Added focused geometry tests for auxiliary status item reservations across left-hand and vertically offset displays.
 - Added a manual GitHub Actions workflow for building app artifacts.
 - Added shared Codex and Claude agent guidance through `AGENTS.md`, `CLAUDE.md`, and `docs/AGENT_GUIDE.md`.
 - Added discovery for visible auxiliary status-level windows that are not returned by macOS's private menu bar item list. This covers apps such as Portworth that draw their own menu bar presentation window.
@@ -34,6 +35,7 @@ All notable changes to Ice are tracked here retroactively from the available git
 - Control items now reapply their current status item state after the menu bar section graph is initialized, so startup length and icon updates run with a valid owning section.
 
 ### Fixed
+- Fixed auxiliary status item reservations mixing frames from different displays, which could create an oversized hidden-section spacer when an overlay such as Portworth was on a left-hand display.
 - Fixed a recursive status item frame/length update loop that could crash Ice with a main-thread stack overflow.
 - Fixed startup behavior where items assigned to the Hidden Section could still appear in the native menu bar because the hidden spacer length was not reapplied.
 - Fixed hidden section hide transitions that could leave items visible after clicking Hide.

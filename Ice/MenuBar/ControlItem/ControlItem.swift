@@ -367,11 +367,11 @@ final class ControlItem {
 
         let auxiliaryFrames = auxiliaryStatusItemFrames(from: appState.itemManager.itemCache[.visible])
         let dividerFrame = windowID.flatMap(WindowInfo.init(windowID:))?.frame ?? windowFrame ?? window?.frame
-        let rowAuxiliaryFrames = if let dividerFrame {
-            auxiliaryFrames.filter { abs($0.minY - dividerFrame.minY) <= 2 }
-        } else {
-            auxiliaryFrames.filter { abs($0.minY) <= 2 }
-        }
+        let rowAuxiliaryFrames = AuxiliaryStatusItemReservationGeometry.rowFrames(
+            from: auxiliaryFrames,
+            dividerFrame: dividerFrame,
+            displayBounds: NSScreen.screens.map { CGDisplayBounds($0.displayID) }
+        )
         let fallbackReservedLength = rowAuxiliaryFrames
             .map { $0.width + (auxiliaryStatusItemPadding * auxiliaryStatusItemFallbackPaddingMultiplier) }
             .max() ?? 0

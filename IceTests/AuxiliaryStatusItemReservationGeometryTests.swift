@@ -1,0 +1,71 @@
+//
+//  AuxiliaryStatusItemReservationGeometryTests.swift
+//  IceTests
+//
+
+import CoreGraphics
+import XCTest
+@testable import Ice
+
+final class AuxiliaryStatusItemReservationGeometryTests: XCTestCase {
+    func testRowFramesExcludeAuxiliaryItemsOnLeftHandDisplay() {
+        let leftDisplay = CGRect(x: -1512, y: 0, width: 1512, height: 982)
+        let mainDisplay = CGRect(x: 0, y: 0, width: 1512, height: 982)
+        let divider = CGRect(x: 900, y: 0, width: 30, height: 33)
+        let leftDisplayOverlay = CGRect(x: -500, y: 0, width: 180, height: 33)
+        let mainDisplayOverlay = CGRect(x: 700, y: 0, width: 180, height: 33)
+
+        let frames = AuxiliaryStatusItemReservationGeometry.rowFrames(
+            from: [leftDisplayOverlay, mainDisplayOverlay],
+            dividerFrame: divider,
+            displayBounds: [leftDisplay, mainDisplay]
+        )
+
+        XCTAssertEqual(frames, [mainDisplayOverlay])
+    }
+
+    func testRowFramesKeepAuxiliaryItemsOnVerticallyOffsetDividerDisplay() {
+        let mainDisplay = CGRect(x: 0, y: 0, width: 1512, height: 982)
+        let upperDisplay = CGRect(x: 0, y: -1080, width: 1920, height: 1080)
+        let divider = CGRect(x: 1200, y: -1080, width: 30, height: 33)
+        let mainDisplayOverlay = CGRect(x: 700, y: 0, width: 180, height: 33)
+        let upperDisplayOverlay = CGRect(x: 900, y: -1080, width: 180, height: 33)
+
+        let frames = AuxiliaryStatusItemReservationGeometry.rowFrames(
+            from: [mainDisplayOverlay, upperDisplayOverlay],
+            dividerFrame: divider,
+            displayBounds: [mainDisplay, upperDisplay]
+        )
+
+        XCTAssertEqual(frames, [upperDisplayOverlay])
+    }
+
+    func testRowFramesUseFrameCenterForAnOverlayStraddlingDisplays() {
+        let leftDisplay = CGRect(x: -1512, y: 0, width: 1512, height: 982)
+        let mainDisplay = CGRect(x: 0, y: 0, width: 1512, height: 982)
+        let divider = CGRect(x: 900, y: 0, width: 30, height: 33)
+        let mostlyLeftOverlay = CGRect(x: -100, y: 0, width: 102, height: 33)
+
+        let frames = AuxiliaryStatusItemReservationGeometry.rowFrames(
+            from: [mostlyLeftOverlay],
+            dividerFrame: divider,
+            displayBounds: [leftDisplay, mainDisplay]
+        )
+
+        XCTAssertTrue(frames.isEmpty)
+    }
+
+    func testRowFramesRejectUnknownDividerDisplay() {
+        let mainDisplay = CGRect(x: 0, y: 0, width: 1512, height: 982)
+        let staleDivider = CGRect(x: 2000, y: 0, width: 30, height: 33)
+        let mainDisplayOverlay = CGRect(x: 700, y: 0, width: 180, height: 33)
+
+        let frames = AuxiliaryStatusItemReservationGeometry.rowFrames(
+            from: [mainDisplayOverlay],
+            dividerFrame: staleDivider,
+            displayBounds: [mainDisplay]
+        )
+
+        XCTAssertTrue(frames.isEmpty)
+    }
+}
