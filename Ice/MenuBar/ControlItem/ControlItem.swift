@@ -60,7 +60,7 @@ final class ControlItem {
     private var auxiliaryStatusItemReservationFrames = [CGRect]()
 
     /// Last nonzero hidden-section reservation for auxiliary status item windows.
-    private var auxiliaryStatusItemReservationLengthCache: CGFloat = 0
+    private var auxiliaryStatusItemReservationCache = AuxiliaryStatusItemReservationCache()
 
     /// Storage for internal observers.
     private var cancellables = Set<AnyCancellable>()
@@ -350,7 +350,7 @@ final class ControlItem {
         }
 
         auxiliaryStatusItemReservationFrames = auxiliaryStatusItemFrames(from: items, includeCachedFrames: false)
-        auxiliaryStatusItemReservationLengthCache = 0
+        auxiliaryStatusItemReservationCache.reset()
         _ = auxiliaryStatusItemReservationLength(for: .showItems)
     }
 
@@ -367,6 +367,9 @@ final class ControlItem {
 
         let auxiliaryFrames = auxiliaryStatusItemFrames(from: appState.itemManager.itemCache[.visible])
         let dividerFrame = windowID.flatMap(WindowInfo.init(windowID:))?.frame ?? windowFrame ?? window?.frame
+        let displayID = dividerFrame.flatMap { frame in
+            NSScreen.screens.first { CGDisplayBounds($0.displayID).contains(CGPoint(x: frame.midX, y: frame.midY)) }?.displayID
+        } ?? window?.screen?.displayID
         let rowAuxiliaryFrames = AuxiliaryStatusItemReservationGeometry.rowFrames(
             from: auxiliaryFrames,
             dividerFrame: dividerFrame,
@@ -376,7 +379,7 @@ final class ControlItem {
             .map { $0.width + (auxiliaryStatusItemPadding * auxiliaryStatusItemFallbackPaddingMultiplier) }
             .max() ?? 0
         guard let dividerFrame else {
-            return cachedAuxiliaryStatusItemReservationLength(max(0, fallbackReservedLength - Lengths.standard))
+            return cachedAuxiliaryStatusItemReservationLength(max(0, fallbackReservedLength - Lengths.standard), displayID: displayID)
         }
 
         let relevantAuxiliaryFrames = rowAuxiliaryFrames.filter {
@@ -386,24 +389,23 @@ final class ControlItem {
             let leftmostAuxiliaryItemMinX = relevantAuxiliaryFrames.map(\.minX).min(),
             let rightmostReservedMaxX = relevantAuxiliaryFrames.map({ max($0.maxX, dividerFrame.maxX) }).max()
         else {
-            return cachedAuxiliaryStatusItemReservationLength(max(0, fallbackReservedLength - Lengths.standard))
+            return cachedAuxiliaryStatusItemReservationLength(max(0, fallbackReservedLength - Lengths.standard), displayID: displayID)
         }
 
         let reservedLength = max(
             rightmostReservedMaxX - leftmostAuxiliaryItemMinX + auxiliaryStatusItemPadding,
             fallbackReservedLength
         )
-        return cachedAuxiliaryStatusItemReservationLength(max(0, reservedLength - Lengths.standard))
+        return cachedAuxiliaryStatusItemReservationLength(max(0, reservedLength - Lengths.standard), displayID: displayID)
     }
 
     /// Returns the current reservation or the last nonzero one during transient menu bar layout.
-    private func cachedAuxiliaryStatusItemReservationLength(_ length: CGFloat) -> CGFloat {
-        if length > 0 {
-            auxiliaryStatusItemReservationLengthCache = max(auxiliaryStatusItemReservationLengthCache, length)
-            return auxiliaryStatusItemReservationLengthCache
-        }
-
-        return auxiliaryStatusItemReservationFrames.isEmpty ? 0 : auxiliaryStatusItemReservationLengthCache
+    private func cachedAuxiliaryStatusItemReservationLength(_ length: CGFloat, displayID: CGDirectDisplayID?) -> CGFloat {
+        auxiliaryStatusItemReservationCache.reserve(
+            length,
+            displayID: displayID,
+            hasAnchors: !auxiliaryStatusItemReservationFrames.isEmpty
+        )
     }
 
     /// Returns cached auxiliary frames plus a live on-screen fallback.

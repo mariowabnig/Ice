@@ -8,6 +8,9 @@ import OSLog
 
 /// A type that encapsulates logging behavior for Ice.
 struct Logger {
+    /// Enable verbose diagnostics explicitly for a troubleshooting launch.
+    private static let diagnosticsEnabled = ProcessInfo.processInfo.environment["ICE_DIAGNOSTICS"] == "1"
+
     /// The unified logger at the base of this logger.
     private let base: os.Logger
 
@@ -27,8 +30,12 @@ struct Logger {
     }
 
     /// Logs diagnostic information when explicitly enabled.
-    func diagnostic(_ message: String) {
-        base.warning("[diag] \(message, privacy: .public)")
+    func diagnostic(_ message: @autoclosure () -> String) {
+        guard Self.diagnosticsEnabled else {
+            return
+        }
+        let diagnosticMessage = message()
+        base.debug("[diag] \(diagnosticMessage, privacy: .public)")
     }
 
     /// Logs the given error message to the logger.

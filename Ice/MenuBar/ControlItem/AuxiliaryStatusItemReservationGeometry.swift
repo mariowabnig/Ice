@@ -31,3 +31,26 @@ enum AuxiliaryStatusItemReservationGeometry {
         }
     }
 }
+
+/// Keeps reveal spacing stable during layout without carrying it between displays.
+struct AuxiliaryStatusItemReservationCache {
+    private var displayID: CGDirectDisplayID?
+    private var length: CGFloat = 0
+
+    mutating func reset() {
+        length = 0
+        displayID = nil
+    }
+
+    mutating func reserve(_ proposedLength: CGFloat, displayID: CGDirectDisplayID?, hasAnchors: Bool) -> CGFloat {
+        if self.displayID != displayID {
+            length = 0
+            self.displayID = displayID
+        }
+        if proposedLength > 0 {
+            length = max(length, proposedLength)
+            return length
+        }
+        return hasAnchors ? length : 0
+    }
+}

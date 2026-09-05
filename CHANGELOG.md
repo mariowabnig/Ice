@@ -4,6 +4,12 @@ All notable changes to Ice are tracked here retroactively from the available git
 
 ## Unreleased
 
+### Audit fixes
+- Respect the auto-rehide toggle for focused-app changes, including while a delayed hide is pending.
+- Prevent a canceled Ice Bar opening from reappearing after a close or display/space change.
+- Reset cached auxiliary spacing when the divider moves to another display.
+- Make verbose diagnostics opt-in with `ICE_DIAGNOSTICS=1` and skip message construction otherwise.
+
 ### Added
 - Added focused geometry tests for auxiliary status item reservations across left-hand and vertically offset displays.
 - Added a manual GitHub Actions workflow for building app artifacts.

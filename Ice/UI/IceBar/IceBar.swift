@@ -13,6 +13,9 @@ final class IceBarPanel: NSPanel {
 
     private(set) var currentSection: MenuBarSection.Name?
 
+    /// Invalidates an opening when the panel closes or a newer opening starts.
+    private var openingGeneration: UInt = 0
+
     private lazy var colorManager = IceBarColorManager(iceBarPanel: self)
 
     private var cancellables = Set<AnyCancellable>()
@@ -154,14 +157,23 @@ final class IceBarPanel: NSPanel {
             return
         }
 
+        openingGeneration &+= 1
+        let generation = openingGeneration
+
         // Important that we set the navigation state and current section before updating the cache.
         appState.navigationState.isIceBarPresented = true
         currentSection = section
 
         await appState.itemManager.cacheItemsIfNeeded()
+        guard generation == openingGeneration else {
+            return
+        }
 
         if ScreenCapture.cachedCheckPermissions() {
             await appState.imageCache.updateCache()
+        }
+        guard generation == openingGeneration else {
+            return
         }
 
         contentView = IceBarHostingView(appState: appState, colorManager: colorManager, screen: screen, section: section) { [weak self] in
@@ -180,6 +192,7 @@ final class IceBarPanel: NSPanel {
     }
 
     override func close() {
+        openingGeneration &+= 1
         super.close()
         contentView = nil
         currentSection = nil

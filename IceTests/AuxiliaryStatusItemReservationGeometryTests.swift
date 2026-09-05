@@ -68,4 +68,20 @@ final class AuxiliaryStatusItemReservationGeometryTests: XCTestCase {
 
         XCTAssertTrue(frames.isEmpty)
     }
+    func testReservationCacheKeepsSpaceDuringLayoutOnSameDisplay() {
+        var cache = AuxiliaryStatusItemReservationCache()
+        XCTAssertEqual(cache.reserve(180, displayID: 1, hasAnchors: true), 180)
+        XCTAssertEqual(cache.reserve(60, displayID: 1, hasAnchors: true), 180)
+        XCTAssertEqual(cache.reserve(0, displayID: 1, hasAnchors: true), 180)
+        cache.reset()
+        XCTAssertEqual(cache.reserve(60, displayID: 1, hasAnchors: true), 60)
+    }
+
+    func testReservationCacheDoesNotCarrySpaceToAnotherDisplay() {
+        var cache = AuxiliaryStatusItemReservationCache()
+        XCTAssertEqual(cache.reserve(180, displayID: 1, hasAnchors: true), 180)
+        XCTAssertEqual(cache.reserve(0, displayID: 2, hasAnchors: true), 0)
+        XCTAssertEqual(cache.reserve(60, displayID: 2, hasAnchors: true), 60)
+        XCTAssertEqual(cache.reserve(40, displayID: 3, hasAnchors: true), 40)
+    }
 }
