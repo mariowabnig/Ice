@@ -70,9 +70,12 @@ final class AuxiliaryStatusItemReservationGeometryTests: XCTestCase {
     }
     func testReservationCacheKeepsSpaceDuringLayoutOnSameDisplay() {
         var cache = AuxiliaryStatusItemReservationCache()
-        XCTAssertEqual(cache.reserve(180, displayID: 1, hasAnchors: true), 180)
-        XCTAssertEqual(cache.reserve(60, displayID: 1, hasAnchors: true), 180)
-        XCTAssertEqual(cache.reserve(0, displayID: 1, hasAnchors: true), 180)
+        XCTAssertEqual(cache.reserve(66, displayID: 1, hasAnchors: true), 66)
+        for proposal in [196, 254, 312, 391, 460, 526] {
+            XCTAssertEqual(cache.reserve(CGFloat(proposal), displayID: 1, hasAnchors: true), 66)
+        }
+        XCTAssertEqual(cache.reserve(30, displayID: 1, hasAnchors: true), 66)
+        XCTAssertEqual(cache.reserve(0, displayID: 1, hasAnchors: true), 66)
         cache.reset()
         XCTAssertEqual(cache.reserve(60, displayID: 1, hasAnchors: true), 60)
     }
@@ -83,5 +86,14 @@ final class AuxiliaryStatusItemReservationGeometryTests: XCTestCase {
         XCTAssertEqual(cache.reserve(0, displayID: 2, hasAnchors: true), 0)
         XCTAssertEqual(cache.reserve(60, displayID: 2, hasAnchors: true), 60)
         XCTAssertEqual(cache.reserve(40, displayID: 3, hasAnchors: true), 40)
+    }
+
+    func testReservationCacheRetainsFirstProposalUntilReset() {
+        var cache = AuxiliaryStatusItemReservationCache()
+        XCTAssertEqual(cache.reserve(0, displayID: 1, hasAnchors: true), 0)
+        XCTAssertEqual(cache.reserve(66, displayID: 1, hasAnchors: true), 66)
+        XCTAssertEqual(cache.reserve(526, displayID: 1, hasAnchors: true), 66)
+        cache.reset()
+        XCTAssertEqual(cache.reserve(196, displayID: 1, hasAnchors: true), 196)
     }
 }

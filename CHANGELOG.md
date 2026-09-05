@@ -5,6 +5,7 @@ All notable changes to Ice are tracked here retroactively from the available git
 ## Unreleased
 
 ### Audit fixes
+- Keep auxiliary spacing fixed during a reveal so Portworth movement cannot grow the divider and push hidden icons out of view.
 - Respect the auto-rehide toggle for focused-app changes, including while a delayed hide is pending.
 - Prevent a canceled Ice Bar opening from reappearing after a close or display/space change.
 - Reset cached auxiliary spacing when the divider moves to another display.

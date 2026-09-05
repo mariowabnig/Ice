@@ -48,7 +48,13 @@ struct AuxiliaryStatusItemReservationCache {
             self.displayID = displayID
         }
         if proposedLength > 0 {
-            length = max(length, proposedLength)
+            // Capture the first positive reservation for this display/reveal.
+            // The divider's later frame already includes this reservation, so
+            // growing the cache from subsequent proposals creates a feedback
+            // loop that pushes auxiliary overlays farther left on every pass.
+            if length == 0 {
+                length = proposedLength
+            }
             return length
         }
         return hasAnchors ? length : 0
