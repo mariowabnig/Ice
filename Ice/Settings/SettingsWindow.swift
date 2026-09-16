@@ -11,6 +11,7 @@ struct SettingsWindow: Scene {
     var body: some Scene {
         Window(Constants.settingsWindowTitle, id: Constants.settingsWindowID) {
             SettingsView()
+                .background(WindowActionsReader(appState: appState))
                 .readWindow { window in
                     guard let window else {
                         return

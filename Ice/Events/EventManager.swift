@@ -533,6 +533,11 @@ extension EventManager {
         guard let mouseLocation = MouseCursor.locationCoreGraphics else {
             return false
         }
+        if #available(macOS 27, *), let appState {
+            return appState.modernMenuBarManager.items.contains { item in
+                !appState.modernMenuBarManager.isConcealed(item) && item.frame.contains(mouseLocation)
+            }
+        }
         let menuBarItems = MenuBarItem.getMenuBarItems(on: screen.displayID, onScreenOnly: true, activeSpaceOnly: true)
         return menuBarItems.contains { $0.frame.contains(mouseLocation) }
     }

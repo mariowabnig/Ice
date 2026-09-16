@@ -137,6 +137,7 @@ enum Defaults {
 
 extension Defaults {
     enum Key: String {
+        case modernMenuBarLayout = "ModernMenuBarLayout"
 
         // MARK: General Settings
 

@@ -94,6 +94,12 @@ final class MenuBarSearchPanel: NSPanel {
 
     /// Shows the search panel on the given screen.
     func show(on screen: NSScreen) async {
+        if #available(macOS 27, *), let appState {
+            appState.navigationState.settingsNavigationIdentifier = .menuBarLayout
+            appState.activate(withPolicy: .regular)
+            appState.openSettingsWindow()
+            return
+        }
         guard let appState else {
             return
         }

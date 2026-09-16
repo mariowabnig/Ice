@@ -1,0 +1,87 @@
+import Foundation
+
+// Raw identifiers and AX mappings adapted from fif7y/Pelmet's MenuBarPolicy
+// (GPL-3.0), revision 76db5715991a82e4583f93c360fba9807750d040.
+enum ModernSystemItem: Int, CaseIterable {
+    case battery = 0, bluetooth, clock, displays, keyboard, volume, wifi, screenMirroring
+    case controlCenter
+
+    var assignmentKey: String { "system:\(rawValue)" }
+}
+
+extension ModernItemID {
+    var systemItem: ModernSystemItem? {
+        if bundleID == "com.apple.TextInputMenuAgent" { return .keyboard }
+        guard bundleID == "com.apple.MenuBarAgent" else { return nil }
+        switch title {
+        case "com.apple.menuextra.battery": return .battery
+        case "com.apple.menuextra.bluetooth": return .bluetooth
+        case "com.apple.menuextra.clock": return .clock
+        case "com.apple.menuextra.display", "com.apple.menuextra.displays": return .displays
+        case "com.apple.menuextra.textinput", "com.apple.menuextra.keyboard": return .keyboard
+        case "com.apple.menuextra.sound": return .volume
+        case "com.apple.menuextra.wifi": return .wifi
+        case "com.apple.menuextra.screen-mirroring": return .screenMirroring
+        default: return nil // Control Center cannot be hidden by this API.
+        }
+    }
+
+    var isUserSwitcher: Bool {
+        bundleID == "com.apple.MenuBarAgent" && title == "com.apple.menuextra.user"
+    }
+
+    var assignmentKey: String {
+        if let systemItem { return systemItem.assignmentKey }
+        if isUserSwitcher { return ModernVisibilityPlan.otherSystemExtrasKey }
+        return bundleID
+    }
+
+    var supportsHiding: Bool {
+        systemItem != nil || isUserSwitcher || Self.supportsBundleHiding(bundleID)
+    }
+
+    static func supportsBundleHiding(_ bundle: String) -> Bool {
+        // SystemUIServer's legacy extras (including Siri) hide together.
+        bundle == "com.apple.systemuiserver" || !bundle.hasPrefix("com.apple.")
+    }
+
+    var systemDisplayName: String? {
+        if isUserSwitcher { return "User" }
+        if title == "com.apple.menuextra.controlcenter" { return "Control Center" }
+        switch systemItem {
+        case .battery: return "Battery"
+        case .bluetooth: return "Bluetooth"
+        case .clock: return "Clock"
+        case .displays: return "Display"
+        case .keyboard: return "Input Menu"
+        case .volume: return "Sound"
+        case .wifi: return "Wi-Fi"
+        case .screenMirroring: return "Screen Mirroring"
+        default: return nil
+        }
+    }
+}
+
+/// The complete assertion state, including system-only hiding requests.
+struct ModernVisibilityPlan: Equatable {
+    static let otherSystemExtrasKey = "system:other-extras"
+    var bundles: Set<String> = []
+    var systemItems: Set<ModernSystemItem> = []
+    var hideOtherSystemExtras = false
+
+    var requiresAssertion: Bool {
+        !bundles.isEmpty || !systemItems.isEmpty || hideOtherSystemExtras
+    }
+
+    var allowedSystemItems: [ModernSystemItem] {
+        ModernSystemItem.allCases.filter { !systemItems.contains($0) }
+    }
+
+    func conceals(_ id: ModernItemID) -> Bool {
+        if let system = id.systemItem { return systemItems.contains(system) }
+        // macOS removes the User menu and optional CC extras whenever ANY
+        // assertion is active; it has no individual exemption for them.
+        if id.isUserSwitcher { return requiresAssertion }
+        return bundles.contains(id.bundleID)
+    }
+}

@@ -61,6 +61,10 @@ Keep setup idempotent. Several managers assume `performSetup()` happens once aft
 
 Menu bar behavior depends on window position, active space, fullscreen status, global user defaults, and CoreGraphics window information. Treat timing-sensitive changes as high risk.
 
+## macOS 27 backend
+
+`AppState` owns `ModernMenuBarManager` for macOS 27. It discovers scene-based items through `ModernItemEnumerator`, keeps app-level assignments in `ModernMenuBarLayout`, and feeds `ModernMenuBarLayoutPane`. The older item/image-cache managers are not started on this path. Section actions use a process-bound MenuBarClientCore assertion; physical order uses verified native Command-drags. See [macOS 27 compatibility](docs/MACOS_27.md) for boundaries, limitations, provenance, and QA.
+
 ## Settings and Persistence
 
 Settings are persisted through `Ice/Utilities/Defaults.swift`, which centralizes `UserDefaults` keys. Settings managers own domain-specific state:

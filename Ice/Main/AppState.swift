@@ -21,6 +21,8 @@ final class AppState: ObservableObject {
     /// Manager for menu bar items.
     private(set) lazy var itemManager = MenuBarItemManager(appState: self)
 
+    private(set) lazy var modernMenuBarManager = ModernMenuBarManager()
+
     /// Manager for the state of the menu bar.
     private(set) lazy var menuBarManager = MenuBarManager(appState: self)
 
@@ -62,6 +64,10 @@ final class AppState: ObservableObject {
 
     /// Storage for internal observers.
     private var cancellables = Set<AnyCancellable>()
+    private var hasPerformedSetup = false
+    private var openWindowAction: OpenWindowAction?
+    private var dismissWindowAction: DismissWindowAction?
+    private var pendingWindowID: String?
 
     /// A Boolean value that indicates whether the app is running as a SwiftUI preview.
     let isPreview: Bool = {
@@ -146,6 +152,7 @@ final class AppState: ObservableObject {
                 return
             }
             Task.detached {
+                if #available(macOS 27, *) { return }
                 if ScreenCapture.cachedCheckPermissions(reset: true) {
                     await self.imageCache.updateCacheWithoutChecks(sections: MenuBarSection.Name.allCases)
                 }
@@ -179,14 +186,20 @@ final class AppState: ObservableObject {
 
     /// Sets up the app state.
     func performSetup() {
+        guard !hasPerformedSetup else { return }
+        hasPerformedSetup = true
         configureCancellables()
         permissionsManager.stopAllChecks()
         menuBarManager.performSetup()
         appearanceManager.performSetup()
         eventManager.performSetup()
         settingsManager.performSetup()
-        itemManager.performSetup()
-        imageCache.performSetup()
+        if #available(macOS 27, *) {
+            modernMenuBarManager.performSetup()
+        } else {
+            itemManager.performSetup()
+            imageCache.performSetup()
+        }
         updatesManager.performSetup()
         userNotificationManager.performSetup()
     }
@@ -208,6 +221,7 @@ final class AppState: ObservableObject {
         }
         settingsWindow = window
         configureCancellables()
+        finishPendingPresentation(window, id: Constants.settingsWindowID)
     }
 
     /// Assigns the permissions window to the app state.
@@ -218,38 +232,79 @@ final class AppState: ObservableObject {
         }
         permissionsWindow = window
         configureCancellables()
+        finishPendingPresentation(window, id: Constants.permissionsWindowID)
     }
 
     /// Opens the settings window.
     func openSettingsWindow() {
-        with(EnvironmentValues()) { environment in
-            environment.openWindow(id: Constants.settingsWindowID)
-        }
+        presentWindow(id: Constants.settingsWindowID, existing: settingsWindow)
     }
 
     /// Dismisses the settings window.
     func dismissSettingsWindow() {
-        with(EnvironmentValues()) { environment in
-            environment.dismissWindow(id: Constants.settingsWindowID)
-        }
+        settingsWindow?.orderOut(nil)
+        dismissWindowAction?(id: Constants.settingsWindowID)
     }
 
     /// Opens the permissions window.
     func openPermissionsWindow() {
-        with(EnvironmentValues()) { environment in
-            environment.openWindow(id: Constants.permissionsWindowID)
-        }
+        presentWindow(id: Constants.permissionsWindowID, existing: permissionsWindow)
     }
 
     /// Dismisses the permissions window.
     func dismissPermissionsWindow() {
-        with(EnvironmentValues()) { environment in
-            environment.dismissWindow(id: Constants.permissionsWindowID)
+        permissionsWindow?.orderOut(nil)
+        dismissWindowAction?(id: Constants.permissionsWindowID)
+    }
+
+    /// Actions must come from a live SwiftUI scene; a new EnvironmentValues
+    /// instance has no reliable connection to the app's window lifecycle.
+    func assignWindowActions(open: OpenWindowAction, dismiss: DismissWindowAction) {
+        openWindowAction = open
+        dismissWindowAction = dismiss
+        if let pendingWindowID {
+            DispatchQueue.main.async { [weak self] in
+                guard self?.pendingWindowID == pendingWindowID else { return }
+                open(id: pendingWindowID)
+            }
+        }
+    }
+
+    private func presentWindow(id: String, existing: NSWindow?) {
+        pendingWindowID = id
+        if let window = existing ?? NSApp.windows.first(where: { $0.identifier?.rawValue == id }) {
+            finishPendingPresentation(window, id: id)
+        } else {
+            openWindowAction?(id: id)
+        }
+    }
+
+    private func finishPendingPresentation(_ window: NSWindow, id: String) {
+        guard pendingWindowID == id else { return }
+        pendingWindowID = nil
+        // Menu tracking and SwiftUI's window attachment must finish before
+        // activation. Native ordering also restores a closed/minimized window.
+        DispatchQueue.main.async { [weak self, weak window] in
+            guard let self, let window else { return }
+            self.activate(withPolicy: .regular)
+            if window.isMiniaturized { window.deminiaturize(nil) }
+            let behavior = window.collectionBehavior
+            if !behavior.contains(.canJoinAllSpaces) {
+                window.collectionBehavior.insert(.moveToActiveSpace)
+            }
+            window.makeKeyAndOrderFront(nil)
+            window.orderFrontRegardless()
+            window.collectionBehavior = behavior
         }
     }
 
     /// Activates the app and sets its activation policy to the given value.
     func activate(withPolicy policy: NSApplication.ActivationPolicy) {
+        if #available(macOS 27, *) {
+            NSApp.setActivationPolicy(policy)
+            NSApp.activate()
+            return
+        }
         // Store whether the app has previously activated inside an internal
         // context to keep it isolated.
         enum Context {

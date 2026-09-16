@@ -72,7 +72,12 @@ struct GeneralSettingsPane: View {
                 autoRehideOptions
             }
             IceSection {
-                spacingOptions
+                if #available(macOS 27, *) {
+                    Text("Menu bar spacing is managed by macOS 27.")
+                        .foregroundStyle(.secondary)
+                } else {
+                    spacingOptions
+                }
             }
         }
         .alert(isPresented: $isPresentingError, error: presentedError) {
@@ -175,9 +180,14 @@ struct GeneralSettingsPane: View {
 
     @ViewBuilder
     private var iceBarOptions: some View {
-        useIceBar
-        if manager.useIceBar {
-            iceBarLocationPicker
+        if #available(macOS 27, *) {
+            Text("On macOS 27, hidden items open in the system menu bar. Use Menu Bar Layout to find and arrange them.")
+                .foregroundStyle(.secondary)
+        } else {
+            useIceBar
+            if manager.useIceBar {
+                iceBarLocationPicker
+            }
         }
     }
 

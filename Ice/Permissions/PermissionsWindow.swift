@@ -11,6 +11,7 @@ struct PermissionsWindow: Scene {
     var body: some Scene {
         Window(Constants.permissionsWindowTitle, id: Constants.permissionsWindowID) {
             PermissionsView()
+                .background(WindowActionsReader(appState: appState))
                 .readWindow { window in
                     guard let window else {
                         return

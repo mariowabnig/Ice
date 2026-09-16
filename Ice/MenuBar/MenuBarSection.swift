@@ -73,6 +73,9 @@ final class MenuBarSection {
 
     /// A Boolean value that indicates whether the section is hidden.
     var isHidden: Bool {
+        if #available(macOS 27, *), let appState {
+            return !appState.modernMenuBarManager.revealed.contains(name == .alwaysHidden ? .alwaysHidden : .hidden)
+        }
         if useIceBar {
             if controlItem.state == .showItems {
                 return false
@@ -100,6 +103,7 @@ final class MenuBarSection {
 
     /// A Boolean value that indicates whether the section is enabled.
     var isEnabled: Bool {
+        if #available(macOS 27, *) { return true }
         if case .visible = name {
             // The visible section should always be enabled.
             return true
@@ -138,6 +142,12 @@ final class MenuBarSection {
         Logger.menuBarSection.diagnostic(
             "show requested section=\(name.logString) controlState=\(controlItem.state) useIceBar=\(useIceBar)"
         )
+        if #available(macOS 27, *) {
+            appState.modernMenuBarManager.reveal(name == .alwaysHidden ? .alwaysHidden : .hidden)
+            appState.menuBarManager.section(withName: .visible)?.controlItem.state = .showItems
+            startRehideChecks()
+            return
+        }
         guard controlItem.isAddedToMenuBar else {
             // The section is disabled.
             // TODO: Can we use isEnabled for this check?
@@ -202,6 +212,15 @@ final class MenuBarSection {
         Logger.menuBarSection.diagnostic(
             "hide requested section=\(name.logString) controlState=\(controlItem.state) useIceBar=\(useIceBar)"
         )
+        if #available(macOS 27, *) {
+            appState.modernMenuBarManager.conceal(name == .alwaysHidden ? .alwaysHidden : .hidden)
+            if !appState.modernMenuBarManager.revealed.contains(.hidden) {
+                appState.menuBarManager.section(withName: .visible)?.controlItem.state = .hideItems
+            }
+            appState.allowShowOnHover()
+            stopRehideChecks()
+            return
+        }
         iceBarPanel?.close()
         switch name {
         case _ where useIceBar:

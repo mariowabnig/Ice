@@ -69,12 +69,12 @@ extension Bridging {
     /// against the menu bar window list. Needed on macOS 26+ where `NSWindow.windowNumber`
     /// can exceed `UInt32` range.
     static func getCGWindowID(for window: NSWindow) -> CGWindowID? {
-        if let id = UInt32(exactly: window.windowNumber) {
+        if let id = UInt32(exactly: window.windowNumber), WindowInfo(windowID: id) != nil {
             return CGWindowID(id)
         }
         let frame = window.frame
-        guard let screen = NSScreen.main else { return nil }
-        let screenY = screen.frame.height - frame.origin.y - frame.height
+        guard let primaryScreen = NSScreen.screens.first else { return nil }
+        let screenY = primaryScreen.frame.maxY - frame.maxY
         for candidateID in getWindowList(option: [.onScreen, .menuBarItems]) {
             guard let candidateFrame = getWindowFrame(for: candidateID) else { continue }
             if

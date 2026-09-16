@@ -157,6 +157,11 @@ final class IceBarPanel: NSPanel {
             return
         }
 
+        if #available(macOS 27, *) {
+            appState.menuBarManager.section(withName: section)?.show()
+            return
+        }
+
         openingGeneration &+= 1
         let generation = openingGeneration
 

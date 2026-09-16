@@ -4,6 +4,15 @@ All notable changes to Ice are tracked here retroactively from the available git
 
 ## Unreleased
 
+### macOS 27 compatibility
+- Document and verify that Menu Bar Layout temporarily reveals all items; leaving the pane restores saved hiding assignments, including BetterTouchTool.
+- Restore hiding for supported system controls such as Wi-Fi, add grouped hiding for User, and let cross-section drops assign visibility without requiring a physical menu bar move.
+- Add an Accessibility-based menu bar editor with app-icon fallbacks, search, verified native reordering, and per-app section assignments on macOS 27.
+- Route reveal/rehide through MenuBarClientCore; stop stretching obsolete divider windows. Document system-item and separate-bar limitations in [macOS 27 notes](docs/MACOS_27.md).
+- Replace the incompatible CompactSlider dependency with native SwiftUI sliders.
+- Fix capture-buffer lifetime, initial image-cache sizing, and scene-window ID validation; keep setup idempotent and avoid deactivation on last-window close on macOS 27.
+- Fix Settings window presentation with scene-bound window actions and native foreground ordering; restore minimized windows and reopen Settings when Ice is opened from Finder.
+
 ### Audit fixes
 - Keep auxiliary spacing fixed during a reveal so Portworth movement cannot grow the divider and push hidden icons out of view.
 - Respect the auto-rehide toggle for focused-app changes, including while a delayed hide is pending.

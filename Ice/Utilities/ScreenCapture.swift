@@ -10,6 +10,10 @@ import ScreenCaptureKit
 enum ScreenCapture {
     /// Returns a Boolean value that indicates whether the app has been granted screen capture permissions.
     static func checkPermissions() -> Bool {
+        if #available(macOS 27, *) {
+            // Individual item window titles no longer indicate capture access.
+            return CGPreflightScreenCaptureAccess()
+        }
         for item in MenuBarItem.getMenuBarItems(onScreenOnly: false, activeSpaceOnly: true) {
             // Don't check items owned by Ice.
             if item.owningApplication == .current {
@@ -61,7 +65,9 @@ enum ScreenCapture {
     ///   - screenBounds: The bounds to capture. Pass `nil` to capture the minimum rectangle that encloses the windows.
     ///   - option: Options that specify the image to be captured.
     static func captureWindows(_ windowIDs: [CGWindowID], screenBounds: CGRect? = nil, option: CGWindowImageOption = []) -> CGImage? {
+        guard !windowIDs.isEmpty else { return nil }
         let pointer = UnsafeMutablePointer<UnsafeRawPointer?>.allocate(capacity: windowIDs.count)
+        defer { pointer.deallocate() }
         for (index, windowID) in windowIDs.enumerated() {
             pointer[index] = UnsafeRawPointer(bitPattern: UInt(windowID))
         }

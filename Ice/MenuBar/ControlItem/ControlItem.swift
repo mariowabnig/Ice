@@ -472,6 +472,11 @@ final class ControlItem {
         for state: HidingState? = nil,
         auxiliaryStatusItemReservationLength: CGFloat? = nil
     ) {
+        if #available(macOS 27, *) {
+            // Scene-based items cannot be hidden by stretching a divider.
+            setStatusItemLength(isSectionDivider ? 0 : Lengths.standard)
+            return
+        }
         guard let section else {
             return
         }
@@ -570,6 +575,12 @@ final class ControlItem {
 
     /// Updates the appearance of the status item using the given hiding state.
     private func updateStatusItem(with state: HidingState) {
+        if #available(macOS 27, *), isSectionDivider {
+            // Sections are app assignments on macOS 27, not physical windows.
+            setStatusItemLength(0)
+            statusItem.button?.image = nil
+            return
+        }
         guard
             let appState,
             let section,

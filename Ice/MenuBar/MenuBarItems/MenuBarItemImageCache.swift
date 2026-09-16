@@ -207,11 +207,11 @@ final class MenuBarItemImageCache: ObservableObject {
         }
 
         await MainActor.run { [newImages] in
+            // Publish the coordinate space before subscribers size their views.
+            self.screen = screen
+            self.menuBarHeight = screen.getMenuBarHeight()
             images.merge(newImages) { (_, new) in new }
         }
-
-        self.screen = screen
-        self.menuBarHeight = screen.getMenuBarHeight()
     }
 
     /// Updates the cache for the given sections, if necessary.

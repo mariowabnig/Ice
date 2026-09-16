@@ -92,6 +92,12 @@ brew install --cask jordanbaird-ice
 
 Ice uses a number of system APIs that are available starting in macOS 14. As such, there are no plans to support earlier versions of macOS.
 
+## macOS 27
+
+The fork uses a separate MenuBarAgent accessibility backend on macOS 27. Menu Bar Layout displays app icons and names, supports native drag reordering, and assigns apps to Visible, Hidden, or Always-Hidden sections. Accessibility is required; Screen Recording is optional for this editor. All status icons belonging to one app share a hiding assignment. Core system controls such as Wi-Fi can be hidden separately; User hides with optional Control Center extras.
+
+The separate Ice Bar uses the system menu bar on macOS 27. Some optional Control Center extras are not preserved by the new hiding API. See [compatibility details and verification](docs/MACOS_27.md) before relying on this experimental path.
+
 ## Automatically hidden menu bars
 
 Ice can show and rehide hidden items when macOS is configured to automatically hide and show the menu bar. Some menu bar apps also draw their own status-level windows instead of relying only on macOS's native status item list. Ice treats visible auxiliary status-level windows as menu bar items when possible and reserves room from their hidden-state position while hidden items are shown. Bundle-identified auxiliary overlays are treated as read-only items owned by their app. Unknown non-contract auxiliary windows can still be visually covered while the system menu bar is retracted and redrawn centered when they are top-pinned. Cover images are cached and refreshed only when they need to change.

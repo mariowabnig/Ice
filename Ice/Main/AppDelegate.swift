@@ -65,6 +65,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+        if #available(macOS 27, *) {
+            // Deactivation with no visible windows can terminate a menu bar app
+            // on macOS 27. Keep its status items alive when Settings closes.
+            return false
+        }
         // Deactivate and set the policy to accessory when all windows are closed.
         appState?.deactivate(withPolicy: .accessory)
         return false
@@ -72,6 +77,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationSupportsSecureRestorableState(_ app: NSApplication) -> Bool {
         return true
+    }
+
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        openSettingsWindow()
+        return true
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        if #available(macOS 27, *) {
+            appState?.modernMenuBarManager.stop()
+        }
     }
 
     // MARK: Other Methods
