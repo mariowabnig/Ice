@@ -1,3 +1,8 @@
+//
+//  ModernSystemItem.swift
+//  Ice
+//
+
 import Foundation
 
 // Raw identifiers and AX mappings adapted from fif7y/Pelmet's MenuBarPolicy

@@ -14,10 +14,17 @@ on:
 jobs:
   swiftlint:
     if: '!github.event.pull_request.merged'
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v6
+      - name: Install pinned SwiftLint
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/swiftlint"
+          gh release download 0.65.1 --repo realm/SwiftLint --pattern portable_swiftlint.zip --dir "$RUNNER_TEMP/swiftlint"
+          ditto -x -k "$RUNNER_TEMP/swiftlint/portable_swiftlint.zip" "$RUNNER_TEMP/swiftlint"
       - name: Run SwiftLint
-        uses: norio-nomura/action-swiftlint@3.2.1
-        with:
-          args: --strict
+        run: '"$RUNNER_TEMP/swiftlint/swiftlint" lint --strict'

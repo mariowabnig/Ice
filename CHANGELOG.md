@@ -32,6 +32,7 @@ All notable changes to Ice are tracked here retroactively from the available git
 - Added visual cover panels for auxiliary status-level windows while the system menu bar is retracted, so app-owned status windows do not linger on the desktop.
 
 ### Changed
+- Pin SwiftLint 0.65.1 in CI, use the same tool locally, and resolve strict lint violations in the merged sources while preserving checked Core Foundation bridges.
 - The GitHub Actions app artifact workflow now also runs on pushes to `main`, keeping the artifact install fallback fresh after shipped changes.
 - The app artifact workflow now uses current major versions of the GitHub checkout and artifact upload actions to avoid the Node 20 actions deprecation path.
 - `build-and-install.sh` now falls back to the latest successful GitHub Actions app artifact when full local Xcode is unavailable, then still installs and re-signs the app with the stable local identity.

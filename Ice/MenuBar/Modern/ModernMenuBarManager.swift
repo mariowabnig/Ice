@@ -1,3 +1,8 @@
+//
+//  ModernMenuBarManager.swift
+//  Ice
+//
+
 import Cocoa
 import Combine
 
@@ -146,7 +151,8 @@ final class ModernMenuBarManager: ObservableObject {
         let runningBundles = Set(NSWorkspace.shared.runningApplications.compactMap(\.bundleIdentifier))
         let requestedPlan = layout.visibilityPlan(
             revealing: isEditing ? Set(ModernMenuBarLayout.Section.allCases) : revealed,
-            runningBundles: runningBundles, ownBundle: Constants.bundleIdentifier
+            runningBundles: runningBundles,
+            ownBundle: Constants.bundleIdentifier
         )
         let requested = items.filter { layout.section(for: $0.id) == section && requestedPlan.conceals($0.id) }
         let stillVisible = requested.filter { lastObservedIDs.contains($0.id) }
@@ -157,7 +163,8 @@ final class ModernMenuBarManager: ObservableObject {
         let runningBundles = Set(NSWorkspace.shared.runningApplications.compactMap(\.bundleIdentifier))
         let effective = layout.visibilityPlan(
             revealing: isEditing ? Set(ModernMenuBarLayout.Section.allCases) : revealed,
-            runningBundles: runningBundles, ownBundle: Constants.bundleIdentifier
+            runningBundles: runningBundles,
+            ownBundle: Constants.bundleIdentifier
         )
         let allowed = runningBundles.subtracting(effective.bundles).union([Constants.bundleIdentifier])
         if let failure = visibilityFailure, failure.plan == effective, !forceRetry {
@@ -168,7 +175,7 @@ final class ModernMenuBarManager: ObservableObject {
         }
         if !forceRetry,
            effective == appliedVisibility,
-           (!effective.requiresAssertion || allowed == appliedAllowedBundles),
+           !effective.requiresAssertion || allowed == appliedAllowedBundles,
            assertion != nil || !effective.requiresAssertion {
             updateVisibilityStatus(for: effective)
             return

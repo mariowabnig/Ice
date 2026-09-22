@@ -1,3 +1,8 @@
+//
+//  ModernMenuBarLayoutPane.swift
+//  Ice
+//
+
 import SwiftUI
 import UniformTypeIdentifiers
 

@@ -88,10 +88,9 @@ final class AppState: ObservableObject {
 
         appearanceManager.performSetup(with: self)
         eventManager.performSetup(with: self)
-        if #available(macOS 27.0, *) {
-            // MenuBarAgent no longer exposes the individual CG windows that
-            // the legacy item manager and image cache depend on.
-        } else {
+        // MenuBarAgent no longer exposes the individual CG windows that the
+        // legacy item manager and image cache depend on, starting with macOS 27.
+        if #unavailable(macOS 27.0) {
             await itemManager.performSetup(with: self)
             imageCache.performSetup(with: self)
         }

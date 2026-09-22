@@ -1,3 +1,8 @@
+//
+//  ModernMenuBarLayout.swift
+//  Ice
+//
+
 import Foundation
 
 /// macOS 27 has stable app identities but no individual CGWindowIDs for status items.
@@ -51,7 +56,8 @@ struct ModernMenuBarLayout: Codable, Equatable {
             $0 != .controlCenter && isHidden(key: $0.assignmentKey, revealing: sections)
         }
         return ModernVisibilityPlan(
-            bundles: Set(bundles), systemItems: Set(systemItems),
+            bundles: Set(bundles),
+            systemItems: Set(systemItems),
             hideOtherSystemExtras: isHidden(key: ModernVisibilityPlan.otherSystemExtrasKey, revealing: sections)
         )
     }

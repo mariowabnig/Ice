@@ -1,3 +1,8 @@
+//
+//  ModernVisibilityLifecycle.swift
+//  Ice
+//
+
 import CoreGraphics
 import Foundation
 

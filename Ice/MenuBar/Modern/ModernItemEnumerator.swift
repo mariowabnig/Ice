@@ -1,3 +1,8 @@
+//
+//  ModernItemEnumerator.swift
+//  Ice
+//
+
 // Adapted from fif7y/Pelmet (GPL-3.0). See docs/MACOS_27.md.
 // ModernItemEnumerator.swift
 // AX snapshot of MenuBarAgent's item tree. Verified structure (M1 findings):
@@ -247,7 +252,8 @@ public actor ModernItemEnumerator {
         // terminator — decode exactly that rather than the whole buffer.
         let written = proc_pidpath(pid, &buffer, UInt32(buffer.count))
         guard written > 0 else { return nil }
-        return URL(fileURLWithPath: String(decoding: buffer[..<Int(written)], as: UTF8.self))
+        guard let path = String(bytes: buffer[..<Int(written)], encoding: .utf8) else { return nil }
+        return URL(fileURLWithPath: path)
     }
 
     /// Each distinct drop is logged once per process lifetime: the walk runs
@@ -283,7 +289,12 @@ public actor ModernItemEnumerator {
     private func statusItemTitle(in appNode: AXUIElement) -> String? {
         let menuBars = children(of: appNode).filter { role(of: $0) == "AXMenuBar" }
         let explicit = copyAttribute(appNode, kAXExtrasMenuBarAttribute)
-            .flatMap { CFGetTypeID($0) == AXUIElementGetTypeID() ? ($0 as! AXUIElement) : nil }
+            .flatMap { value -> AXUIElement? in
+                guard CFGetTypeID(value) == AXUIElementGetTypeID() else { return nil }
+                // CF types require a forced bridge after checking the runtime type ID.
+                // swiftlint:disable:next force_cast
+                return value as! AXUIElement
+            }
         let extrasBar = explicit ?? menuBars.min { lhs, rhs in
             (frame(of: lhs)?.width ?? .greatestFiniteMagnitude)
                 < (frame(of: rhs)?.width ?? .greatestFiniteMagnitude)
@@ -338,7 +349,10 @@ public actor ModernItemEnumerator {
         guard let value = copyAttribute(element, "AXFrame"),
               CFGetTypeID(value) == AXValueGetTypeID() else { return nil }
         var rect = CGRect.zero
-        guard AXValueGetValue(value as! AXValue, .cgRect, &rect) else { return nil }
+        // The runtime type ID is checked above before bridging this CF value.
+        // swiftlint:disable:next force_cast
+        let axValue = value as! AXValue
+        guard AXValueGetValue(axValue, .cgRect, &rect) else { return nil }
         return rect
     }
 

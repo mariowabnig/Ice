@@ -11,12 +11,12 @@ struct AboutSettingsPane: View {
     @Environment(\.openURL) private var openURL
 
     private var acknowledgementsURL: URL {
+        // The acknowledgements PDF is a required app resource.
         // swiftlint:disable:next force_unwrapping
         Bundle.main.url(forResource: "Acknowledgements", withExtension: "pdf")!
     }
 
     private var contributeURL: URL {
-        // swiftlint:disable:next force_unwrapping
         URL(string: "https://github.com/jordanbaird/Ice")!
     }
 
@@ -25,7 +25,6 @@ struct AboutSettingsPane: View {
     }
 
     private var donateURL: URL {
-        // swiftlint:disable:next force_unwrapping
         URL(string: "https://icemenubar.app/Donate")!
     }
 
@@ -80,7 +79,7 @@ struct AboutSettingsPane: View {
                 if let nsImage = NSImage(named: NSImage.applicationIconName) {
                     Image(nsImage: nsImage)
                         .resizable()
-                        .aspectRatio(contentMode: .fit)
+                        .scaledToFit()
                         .frame(width: 230)
                 }
 

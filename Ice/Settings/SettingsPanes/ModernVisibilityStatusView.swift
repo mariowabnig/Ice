@@ -1,3 +1,8 @@
+//
+//  ModernVisibilityStatusView.swift
+//  Ice
+//
+
 import SwiftUI
 
 /// Shows the live result outside the layout editor, which deliberately reveals items.
