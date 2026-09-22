@@ -18,6 +18,9 @@ final class EventManager: ObservableObject {
     /// Storage for internal observers.
     private var cancellables = Set<AnyCancellable>()
 
+    private var modernInteractionGeneration: UInt64 = 0
+    private var modernEmptySpaceTask: Task<Void, Never>?
+
     // MARK: Monitors
 
     /// Monitor for mouse down events.
@@ -27,6 +30,7 @@ final class EventManager: ObservableObject {
         guard let self, let appState, let screen = bestScreen(appState: appState) else {
             return event
         }
+        cancelModernEmptySpaceAction()
         switch event.type {
         case .leftMouseDown:
             handleShowOnClick(appState: appState, screen: screen)
@@ -53,6 +57,7 @@ final class EventManager: ObservableObject {
         for: .leftMouseDragged
     ) { [weak self] event in
         if let self, let appState, let screen = bestScreen(appState: appState) {
+            cancelModernEmptySpaceAction()
             handleLeftMouseDragged(with: event, appState: appState, screen: screen)
         }
         return event
@@ -66,6 +71,7 @@ final class EventManager: ObservableObject {
         option: .listenOnly
     ) { [weak self] _, event in
         if let self, let appState, let screen = bestScreen(appState: appState) {
+            cancelModernEmptySpaceAction()
             handleShowOnHover(appState: appState, screen: screen)
         }
         return event
@@ -76,6 +82,7 @@ final class EventManager: ObservableObject {
         for: .scrollWheel
     ) { [weak self] event in
         if let self, let appState, let screen = bestScreen(appState: appState) {
+            cancelModernEmptySpaceAction()
             handleShowOnScroll(with: event, appState: appState, screen: screen)
         }
         return event
@@ -140,6 +147,7 @@ final class EventManager: ObservableObject {
 
     /// Stops all monitors.
     func stopAll() {
+        cancelModernEmptySpaceAction()
         for monitor in allMonitors {
             monitor.stop()
         }
@@ -153,6 +161,28 @@ extension EventManager {
     // MARK: Handle Show On Click
 
     private func handleShowOnClick(appState: AppState, screen: NSScreen) {
+        if #available(macOS 27, *) {
+            guard appState.settings.general.showOnClick else { return }
+            let modifiers = NSEvent.modifierFlags
+            if modifiers == .control {
+                handleShowSecondaryContextMenu(appState: appState, screen: screen)
+                return
+            }
+            let section: MenuBarSection?
+            if modifiers == .option, appState.settings.advanced.canToggleAlwaysHiddenSection,
+               let alwaysHidden = appState.menuBarManager.section(withName: .alwaysHidden), alwaysHidden.isEnabled {
+                section = alwaysHidden
+            } else {
+                section = appState.menuBarManager.section(withName: .hidden)
+            }
+            guard let section, section.isEnabled else { return }
+            let wasHidden = section.isHidden
+            scheduleModernEmptySpaceAction(appState: appState, screen: screen, delay: 0.05) {
+                guard appState.settings.general.showOnClick, section.isEnabled, section.isHidden == wasHidden else { return }
+                section.toggle()
+            }
+            return
+        }
         guard
             appState.settings.general.showOnClick,
             isMouseInsideEmptyMenuBarSpace(appState: appState, screen: screen)
@@ -277,6 +307,15 @@ extension EventManager {
     // MARK: Handle Show Secondary Context Menu
 
     private func handleShowSecondaryContextMenu(appState: AppState, screen: NSScreen) {
+        if #available(macOS 27, *) {
+            guard appState.settings.advanced.enableSecondaryContextMenu else { return }
+            scheduleModernEmptySpaceAction(appState: appState, screen: screen, delay: 0.1) {
+                guard appState.settings.advanced.enableSecondaryContextMenu,
+                      let location = MouseHelpers.locationAppKit else { return }
+                appState.menuBarManager.showSecondaryContextMenu(at: location)
+            }
+            return
+        }
         Task {
             guard
                 appState.settings.advanced.enableSecondaryContextMenu,
@@ -381,6 +420,15 @@ extension EventManager {
 
         let delay = appState.settings.advanced.showOnHoverDelay
 
+        if #available(macOS 27, *), hiddenSection.isHidden {
+            scheduleModernEmptySpaceAction(appState: appState, screen: screen, delay: delay) {
+                guard appState.settings.general.showOnHover,
+                      appState.menuBarManager.showOnHoverAllowed, hiddenSection.isHidden else { return }
+                hiddenSection.show()
+            }
+            return
+        }
+
         if hiddenSection.isHidden {
             guard isMouseInsideEmptyMenuBarSpace(appState: appState, screen: screen) else {
                 return
@@ -450,8 +498,55 @@ extension EventManager {
 // MARK: - Helper Methods
 
 extension EventManager {
+    private func cancelModernEmptySpaceAction() {
+        modernInteractionGeneration &+= 1
+        modernEmptySpaceTask?.cancel()
+        modernEmptySpaceTask = nil
+    }
+
+    /// Check cheap menu bounds before querying the application menu. Status-item
+    /// absence is established separately by fresh, complete raw AX geometry.
+    private func isModernEmptySpaceCandidate(appState: AppState, screen: NSScreen) -> Bool {
+        guard isMouseInsideMenuBar(appState: appState, screen: screen),
+              !isMouseInsideNotch(appState: appState, screen: screen),
+              let point = MouseHelpers.locationCoreGraphics,
+              var appMenuFrame = screen.getApplicationMenuFrame(),
+              ModernMenuBarOccupancy.isUsable(appMenuFrame) else { return false }
+        appMenuFrame.size.width += appMenuFrame.origin.x - screen.frame.origin.x
+        appMenuFrame.origin.x = screen.frame.origin.x
+        return !appMenuFrame.contains(point)
+    }
+
+    private func scheduleModernEmptySpaceAction(
+        appState: AppState,
+        screen: NSScreen,
+        delay: TimeInterval,
+        action: @escaping @MainActor () -> Void
+    ) {
+        guard isModernEmptySpaceCandidate(appState: appState, screen: screen),
+              let point = MouseHelpers.locationCoreGraphics else { return }
+        cancelModernEmptySpaceAction()
+        let intent = ModernMenuBarInteractionIntent(point: point, generation: modernInteractionGeneration)
+        modernEmptySpaceTask = Task { [weak self] in
+            if delay > 0 {
+                do { try await Task.sleep(for: .seconds(delay)) } catch { return }
+            }
+            guard let self, !Task.isCancelled,
+                  intent.isCurrent(point: MouseHelpers.locationCoreGraphics, generation: modernInteractionGeneration),
+                  isModernEmptySpaceCandidate(appState: appState, screen: screen) else { return }
+            let isEmpty = await appState.modernMenuBarManager.confirmsEmptySpace(at: point)
+            guard isEmpty, !Task.isCancelled,
+                  intent.isCurrent(point: MouseHelpers.locationCoreGraphics, generation: modernInteractionGeneration),
+                  isModernEmptySpaceCandidate(appState: appState, screen: screen) else { return }
+            action()
+        }
+    }
+
     /// Returns the best screen to use for event manager calculations.
     func bestScreen(appState: AppState) -> NSScreen? {
+        if #available(macOS 27, *) {
+            return NSScreen.screenWithMouse ?? NSScreen.main
+        }
         guard
             appState.activeSpace.isFullscreen,
             let screen = NSScreen.screenWithMouse

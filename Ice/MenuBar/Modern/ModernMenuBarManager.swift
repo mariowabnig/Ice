@@ -20,6 +20,7 @@ final class ModernMenuBarManager: ObservableObject {
 
     let canHide = iceModern_assessmentModeAvailable()
     private let enumerator = ModernItemEnumerator()
+    private let occupancyEnumerator = ModernItemEnumerator()
     private var timer: AnyCancellable?
     private var assertion: AnyObject?
     private var appliedVisibility = ModernVisibilityPlan()
@@ -77,6 +78,21 @@ final class ModernMenuBarManager: ObservableObject {
             isAlive: { pid in
                 NSRunningApplication(processIdentifier: pid)?.isTerminated == false
             }
+        )
+    }
+
+    /// Never approve an empty-space action from the editor's cached/deduplicated
+    /// frames. The actor serializes readers; a new click may wait for a canceled
+    /// hover read, but that wait still consumes the new click's own deadline.
+    func confirmsEmptySpace(at point: CGPoint) async -> Bool {
+        let visibilityGeneration = visibilityLifecycle.generation
+        let requestedAt = ProcessInfo.processInfo.systemUptime
+        let snapshot = await occupancyEnumerator.snapshotOccupancy(
+            deadline: requestedAt + ModernMenuBarOccupancy.maximumSnapshotDuration
+        )
+        guard !Task.isCancelled, visibilityLifecycle.generation == visibilityGeneration else { return false }
+        return snapshot.confirmsEmptySpace(
+            at: point, requestedAt: requestedAt, now: ProcessInfo.processInfo.systemUptime
         )
     }
 

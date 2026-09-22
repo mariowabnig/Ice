@@ -54,7 +54,7 @@ Live verification on this Mac confirmed that the new editor discovers and displa
 
 The system-item update passed all 17 tests and was installed on 2026-09-15. After removing the stale Accessibility entry and adding `/Applications/Ice.app` again, Ice reported permission granted. Its granted-Accessibility / absent-Screen-Recording launch populated the editor. Both Wi-Fi and User were assigned Hidden through their context menus; MenuBarAgent AX confirmed that both disappeared after leaving the editor, while Battery, Clock and Control Center remained. Reopening the editor restored Wi-Fi and User. Both assignments are left in Hidden.
 
-The previous installed app is preserved at `build/backups/2026-09-15-macos27/Ice.app`, and the build before the window fix at `build/backups/2026-09-15-before-window-fix/Ice.app`. Local ad-hoc rebuilds can require macOS to reapprove Accessibility; the latest installation has Accessibility restored. Screen Recording restoration requires a macOS Touch ID prompt. Remaining runtime verification includes a physical move and reverse move, search, and additional displays. Do not infer runtime success from compilation or unit tests.
+The September 15 rollback builds were archived as verified ZIPs under `archived-installs.noindex/` during the September 22 duplicate-install cleanup. Local ad-hoc rebuilds can require macOS to reapprove Accessibility; the latest installation has Accessibility restored. Screen Recording restoration requires a macOS Touch ID prompt. Remaining runtime verification includes a physical move and reverse move, search, and additional displays. Do not infer runtime success from compilation or unit tests.
 
 ## Follow-up verification — 2026-09-16
 
@@ -101,3 +101,35 @@ transport, role and process reads cannot establish that an item was hidden.
 Absent optional attributes remain acceptable. The lifecycle owns the only
 verification generation counter. The standalone production-code harness now
 covers 15 scenarios, including AX error classification and partial snapshots.
+
+
+## Status-item click hit testing — 2026-09-22
+
+The custom build `0.11.13-dev.2-macos27.2` (build `2026092202`) includes the
+current beta and this fork's visibility fixes. Its empty-space click, context-menu
+and hover decisions no longer use the layout editor's cached, deduplicated frames.
+One app may own several status controls, and every raw frame must block an
+empty-space action. Unknown groups, Ice itself and the overflow control count.
+
+A separate actor reads current MenuBarAgent geometry with a 0.4-second total
+deadline and bounded AX messages. Missing or invalid geometry, pointer movement,
+newer input and visibility-generation changes prevent the action. Application
+menus and the notch remain excluded. The original behavior remains on macOS 14–26.
+The tracker's own variable-width indicators can still resize when fresh values
+arrive; this repair targets Ice's unintended hide/reveal actions.
+
+Local installer builds now use `build.noindex/`; previous installations go into
+`Ice-backups.noindex/` beside the installation destination. On the development
+Mac, nine obsolete loose bundles were replaced by extraction-verified ZIPs in
+`archived-installs.noindex/`. Current development products were moved under
+`build.noindex/`. Only `/Applications/Ice.app` is intended for normal launching.
+
+
+Validation: all 44 native Debug XCTest cases, the 15-check standalone harness,
+strict SwiftLint0.65.1, and the universal Release build pass. The installed
+bundle passes recursive signature verification. Removing/re-adding its
+Accessibility entry restored the grant. Live editor-to-General transitions
+revealed then concealed BetterTouchTool and Wi-Fi. The beta still reports
+active-but-unverified hiding after an incomplete discovery snapshot; the native
+UI driver also cannot synthesize physical clicks on macOS 27's composited menu
+bar. Physical tracker-click and additional-display validation remain incomplete.

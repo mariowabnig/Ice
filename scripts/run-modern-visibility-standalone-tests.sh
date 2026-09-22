@@ -314,6 +314,7 @@ xcrun swiftc \
     Ice/MenuBar/Modern/ModernMenuBarLayout.swift \
     Ice/MenuBar/Modern/ModernSystemItem.swift \
     Ice/MenuBar/Modern/ModernItemEnumerator.swift \
+    Ice/MenuBar/Modern/ModernMenuBarOccupancy.swift \
     Ice/MenuBar/Modern/ModernVisibilityLifecycle.swift \
     Ice/MenuBar/ControlItem/AuxiliaryStatusItemReservationGeometry.swift
 "$BIN"

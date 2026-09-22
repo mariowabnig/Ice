@@ -5,6 +5,7 @@ All notable changes to Ice are tracked here retroactively from the available git
 ## Unreleased
 
 ### macOS 27 compatibility
+- Prevent clicks on multi-icon apps such as Claude Usage from toggling Hidden items: confirm empty space using fresh raw Accessibility geometry, reject incomplete/stale reads, and cancel delayed actions after newer input or visibility changes.
 - Integrate the official 0.11.13-dev.2 beta while preserving custom macOS 27, Portworth and auxiliary-item behavior; protect this build from automatic upstream replacement.
 - Verify hiding from complete Accessibility snapshots, retain assertions through temporary unreadable states, reject stale callbacks and bound automatic retries. Treat transport, role and PID read failures as incomplete evidence.
 - Start timed rehide when the pointer is away from the menu bar, including reveals triggered away from it; preserve Always-Hidden toggle settings and section hotkeys.
@@ -32,6 +33,7 @@ All notable changes to Ice are tracked here retroactively from the available git
 - Added visual cover panels for auxiliary status-level windows while the system menu bar is retracted, so app-owned status windows do not linger on the desktop.
 
 ### Changed
+- Keep local build products and installer backups in `.noindex` directories so development copies do not appear as extra Ice installations in Spotlight.
 - Pin SwiftLint 0.65.1 in CI, use the same tool locally, and resolve strict lint violations in the merged sources while preserving checked Core Foundation bridges.
 - The GitHub Actions app artifact workflow now also runs on pushes to `main`, keeping the artifact install fallback fresh after shipped changes.
 - The app artifact workflow now uses current major versions of the GitHub checkout and artifact upload actions to avoid the Node 20 actions deprecation path.

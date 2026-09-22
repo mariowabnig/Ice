@@ -111,6 +111,56 @@ public actor ModernItemEnumerator {
         )
     }
 
+    /// Fresh, bounded occupancy for click/hover decisions. Do not resolve app
+    /// identities or deduplicate: unknown items and every display still occupy
+    /// space, including Ice's own icon and the system overflow control.
+    func snapshotOccupancy(deadline: TimeInterval) -> ModernMenuBarOccupancy {
+        var snapshot = ModernMenuBarOccupancy()
+        guard !Task.isCancelled, ProcessInfo.processInfo.systemUptime < deadline,
+              let agent = resolveAgent(),
+              let windows = occupancyAttribute(agent, kAXChildrenAttribute, deadline: deadline) as? [AXUIElement],
+              !windows.isEmpty else { return snapshot }
+
+        for window in windows {
+            guard let role = occupancyAttribute(window, kAXRoleAttribute, deadline: deadline) as? String else { return snapshot }
+            guard role == "AXWindow" else { continue }
+            guard let windowFrame = occupancyFrame(window, deadline: deadline),
+                  ModernMenuBarOccupancy.isUsable(windowFrame),
+                  let groups = occupancyAttribute(window, kAXChildrenAttribute, deadline: deadline) as? [AXUIElement],
+                  !groups.isEmpty else { return snapshot }
+            snapshot.windowFrames.append(windowFrame)
+            for group in groups {
+                guard let frame = occupancyFrame(group, deadline: deadline),
+                      ModernMenuBarOccupancy.isUsable(frame, allowZeroWidth: true) else { return snapshot }
+                snapshot.itemFrames.append(frame)
+            }
+        }
+        snapshot.isComplete = !snapshot.windowFrames.isEmpty && !Task.isCancelled && ProcessInfo.processInfo.systemUptime <= deadline
+        return snapshot
+    }
+
+    private func occupancyAttribute(_ element: AXUIElement, _ name: String, deadline: TimeInterval) -> CFTypeRef? {
+        let remaining = deadline - ProcessInfo.processInfo.systemUptime
+        guard !Task.isCancelled, remaining > 0 else { return nil }
+        // Bound each remote message as well as the entire traversal. This runs
+        // on a separate actor from the editor's slower identity discovery.
+        guard AXUIElementSetMessagingTimeout(element, Float(min(remaining, 0.05))) == .success else { return nil }
+        var value: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(element, name as CFString, &value) == .success,
+              !Task.isCancelled, ProcessInfo.processInfo.systemUptime <= deadline else { return nil }
+        return value
+    }
+
+    private func occupancyFrame(_ element: AXUIElement, deadline: TimeInterval) -> CGRect? {
+        guard let value = occupancyAttribute(element, "AXFrame", deadline: deadline),
+              CFGetTypeID(value) == AXValueGetTypeID() else { return nil }
+        var rect = CGRect.zero
+        // The Core Foundation type ID was checked above.
+        // swiftlint:disable:next force_cast
+        guard AXValueGetValue(value as! AXValue, .cgRect, &rect) else { return nil }
+        return rect
+    }
+
     private func isMainDisplayFrame(_ frame: CGRect) -> Bool {
         abs(frame.minY - CGDisplayBounds(CGMainDisplayID()).minY) <= 2
     }

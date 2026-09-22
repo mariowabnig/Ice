@@ -137,11 +137,11 @@ xcodebuild_available() {
 build_local_app() {
   echo "=== Building Ice ==="
   xcodebuild -project Ice.xcodeproj -scheme Ice -configuration Release \
-    -derivedDataPath build \
+    -derivedDataPath build.noindex \
     CODE_SIGN_IDENTITY="-" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=YES DEVELOPMENT_TEAM="" \
     DEBUG_INFORMATION_FORMAT=dwarf \
     build 2>&1 | tail -3
-  INSTALL_APP_PATH="build/Build/Products/Release/Ice.app"
+  INSTALL_APP_PATH="build.noindex/Build/Products/Release/Ice.app"
 }
 
 download_artifact_app() {
@@ -238,7 +238,9 @@ fi
 
 echo "=== Installing ==="
 if [[ -e "$DESTINATION_APP_PATH" ]]; then
-  backup_path="${DESTINATION_APP_PATH%.app}-backup-$(date +%Y%m%d-%H%M%S).app"
+  backup_dir="${DESTINATION_APP_PATH%.app}-backups.noindex"
+  mkdir -p "$backup_dir"
+  backup_path="$backup_dir/Ice-$(date +%Y%m%d-%H%M%S).app"
   [[ ! -e "$backup_path" ]] || { echo "ERROR: Backup already exists: $backup_path"; exit 1; }
   mv "$DESTINATION_APP_PATH" "$backup_path"
   echo "  Previous app preserved at $backup_path"

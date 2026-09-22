@@ -2,3 +2,5 @@
 build/
 build-beta-release/
 xcuserdata/
+build.noindex/
+archived-installs.noindex/
