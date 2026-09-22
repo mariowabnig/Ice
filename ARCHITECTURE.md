@@ -15,7 +15,7 @@ IceApp
   -> managers
      -> MenuBarManager / MenuBarItemManager / MenuBarAppearanceManager
      -> EventManager / HotkeyRegistry
-     -> SettingsManager / PermissionsManager / UpdatesManager
+     -> AppSettings / AppPermissions / UpdatesManager
      -> UserNotificationManager / MenuBarItemImageCache
   -> SwiftUI settings, permissions, Ice Bar, layout, and search UI
 ```
@@ -24,10 +24,10 @@ IceApp
 
 ## Startup Flow
 
-1. `IceApp` creates `AppState`, runs migrations, applies the split-view swizzle, and assigns the state to `AppDelegate`.
-2. `AppDelegate.applicationWillFinishLaunching` connects the delegate back into `AppState` and enables background cursor control through `Bridging`.
-3. `AppDelegate.applicationDidFinishLaunching` hides default app menus, dismisses initial windows, then checks permissions.
-4. If required permissions exist, `AppState.performSetup()` initializes managers. If not, the app opens the permissions window.
+1. `AppDelegate` owns `AppState`; `IceApp` supplies it to the SwiftUI scenes.
+2. `applicationWillFinishLaunching` runs migrations and applies the split-view swizzle.
+3. `applicationDidFinishLaunching` hides default menus, enables background cursor control, and checks permissions.
+4. `AppState.performSetup(hasPermissions:)` starts a single lazy setup task when permitted; otherwise it opens Permissions. macOS 27 starts the modern backend, macOS 26 starts `MenuBarItemService`, and earlier systems use legacy discovery.
 
 Keep setup idempotent. Several managers assume `performSetup()` happens once after windows and permissions are ready.
 
@@ -40,11 +40,13 @@ Keep setup idempotent. Several managers assume `performSetup()` happens once aft
 - `Ice/Hotkeys`: hotkey model, registry, modifiers, key codes, and actions.
 - `Ice/Events`: global/local event monitoring and event taps.
 - `Ice/Permissions`: Accessibility and Screen Recording permission checks and prompts.
-- `Ice/Updates`: update-check coordination.
+- `Ice/Main/Updates.swift`: update checks and the custom-build channel guard.
 - `Ice/UserNotifications`: notification identifiers and notification delivery.
 - `Ice/Utilities`: defaults, logging, migrations, screen capture, status-item defaults, window inspection, and shared helpers.
 - `Ice/Bridging`: wrappers around system/private APIs.
-- `Ice/Swizzling`: targeted AppKit behavior overrides.
+- `Shared`: bridging, window information, logging, and service interfaces shared with `MenuBarItemService`.
+- `MenuBarItemService`: upstream beta XPC helper used for macOS 26 discovery.
+- `Ice/Utilities/Swizzling.swift`: targeted AppKit behavior overrides.
 
 ## Menu Bar Model
 
@@ -57,7 +59,7 @@ Keep setup idempotent. Several managers assume `performSetup()` happens once aft
 - application-menu hiding behavior
 - auxiliary status item cover panels for apps that draw status-level windows
 
-`MenuBarItemManager` and related item types discover and track menu bar items. `MenuBarItemImageCache` stores images used by layout/search surfaces. `MenuBarAppearanceManager` applies tint, border, shadow, and shape overlays.
+`MenuBarItemManager` and related item types discover and track menu bar items. `MenuBarItemImageCache` stores window-ID-keyed images with capture scale metadata used by layout/search surfaces. `MenuBarAppearanceManager` applies tint, border, shadow, and shape overlays.
 
 Menu bar behavior depends on window position, active space, fullscreen status, global user defaults, and CoreGraphics window information. Treat timing-sensitive changes as high risk.
 
@@ -78,11 +80,11 @@ Migrations live in `MigrationManager`. When changing persisted values, add a mig
 
 ## Permissions
 
-`PermissionsManager` tracks all permission objects and exposes one permission state:
+`AppPermissions` tracks permission objects and exposes one permission state:
 
-- `missingPermissions`
-- `hasRequiredPermissions`
-- `hasAllPermissions`
+- `missing`
+- `hasRequired`
+- `hasAll`
 
 The app gates setup on required permissions. Permission-related changes need manual QA with permissions both granted and revoked.
 
@@ -92,7 +94,7 @@ The following areas require extra care:
 
 - `Bridging`: private or lower-level system APIs.
 - `WindowInfo` and CoreGraphics window inspection.
-- `UniversalEventMonitor` and event taps.
+- `EventMonitor` and event taps.
 - Screen capture and menu bar item image caching.
 - Swizzled AppKit behavior.
 - Accessibility-driven menu bar discovery/manipulation.

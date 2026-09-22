@@ -17,7 +17,7 @@ enum HotkeyAction: String, Codable, CaseIterable {
     case toggleApplicationMenus = "ToggleApplicationMenus"
 
     @MainActor
-    func perform(appState: AppState) async {
+    func perform(appState: AppState) {
         switch self {
         case .toggleHiddenSection:
             guard let section = appState.menuBarManager.section(withName: .hidden) else {
@@ -26,7 +26,7 @@ enum HotkeyAction: String, Codable, CaseIterable {
             section.toggle()
             // Prevent the section from automatically rehiding after mouse movement.
             if !section.isHidden {
-                appState.preventShowOnHover()
+                appState.menuBarManager.showOnHoverAllowed = false
             }
         case .toggleAlwaysHiddenSection:
             guard let section = appState.menuBarManager.section(withName: .alwaysHidden) else {
@@ -35,14 +35,21 @@ enum HotkeyAction: String, Codable, CaseIterable {
             section.toggle()
             // Prevent the section from automatically rehiding after mouse movement.
             if !section.isHidden {
-                appState.preventShowOnHover()
+                appState.menuBarManager.showOnHoverAllowed = false
             }
         case .searchMenuBarItems:
-            await appState.menuBarManager.searchPanel.toggle()
+            appState.menuBarManager.searchPanel.toggle()
         case .enableIceBar:
-            appState.settingsManager.generalSettingsManager.useIceBar.toggle()
+            if #available(macOS 27.0, *) {
+                appState.menuBarManager.section(withName: .hidden)?.show()
+            } else {
+                appState.settings.general.useIceBar.toggle()
+            }
         case .showSectionDividers:
-            appState.settingsManager.advancedSettingsManager.showSectionDividers.toggle()
+            if #unavailable(macOS 27.0) {
+                let advanced = appState.settings.advanced
+                advanced.sectionDividerStyle = advanced.sectionDividerStyle == .noDivider ? .chevron : .noDivider
+            }
         case .toggleApplicationMenus:
             appState.menuBarManager.toggleApplicationMenus()
         }

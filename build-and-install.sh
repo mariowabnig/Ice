@@ -5,6 +5,7 @@ SIGNING_IDENTITY_NAME="Ice Local Development"
 SIGNING_IDENTITY="-"
 INSTALL_APP_PATH=""
 ARTIFACT_TMPDIR=""
+DESTINATION_APP_PATH="${ICE_INSTALL_APP_PATH:-/Applications/Ice.app}"
 LOGIN_KEYCHAIN="$(
   security default-keychain -d user 2>/dev/null |
     sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e 's/^"//' -e 's/"$//' || true
@@ -107,12 +108,13 @@ sign_installed_app_with_identity() {
   local identity="$1"
   local codesign_args=(--force --sign "$identity" --timestamp=none)
 
-  if [[ -d /Applications/Ice.app/Contents/Frameworks/Sparkle.framework ]]; then
-    codesign --force --sign "$identity" --timestamp=none \
-      /Applications/Ice.app/Contents/Frameworks/Sparkle.framework 2>/dev/null || return 1
-  fi
-
-  codesign "${codesign_args[@]}" /Applications/Ice.app 2>/dev/null
+  # Sign nested beta services and frameworks from the inside out.
+  while IFS= read -r -d '' nested; do
+    codesign "${codesign_args[@]}" "$nested" || return 1
+  done < <(find "$DESTINATION_APP_PATH/Contents" -depth -type d \
+    \( -name '*.xpc' -o -name '*.app' -o -name '*.framework' \) -print0)
+  codesign "${codesign_args[@]}" "$DESTINATION_APP_PATH" || return 1
+  codesign --verify --deep --strict "$DESTINATION_APP_PATH"
 }
 
 codesign_installed_app() {
@@ -124,10 +126,8 @@ codesign_installed_app() {
     return 1
   fi
 
-  echo "  WARN: Stable local signing failed; falling back to ad-hoc signing."
-  echo "  WARN: Accessibility may need approval again."
-  SIGNING_IDENTITY="-"
-  sign_installed_app_with_identity "$SIGNING_IDENTITY"
+  echo "  ERROR: Stable local signing failed; keeping the previous app for recovery."
+  return 1
 }
 
 xcodebuild_available() {
@@ -220,22 +220,36 @@ prepare_install_source() {
   download_artifact_app
 }
 
-prepare_install_source
+if [[ -n "${ICE_INSTALL_SOURCE:-}" ]]; then
+  INSTALL_APP_PATH="$ICE_INSTALL_SOURCE"
+else
+  prepare_install_source
+fi
+[[ -d "$INSTALL_APP_PATH/Contents" ]] || { echo "ERROR: Invalid app source: $INSTALL_APP_PATH"; exit 1; }
 
 echo "=== Preparing signing identity ==="
 resolve_signing_identity
 
-echo "=== Stopping Ice ==="
-pkill -x Ice 2>/dev/null || true
-sleep 1
+if [[ "${ICE_INSTALL_NO_STOP:-0}" != "1" ]]; then
+  echo "=== Stopping Ice ==="
+  pkill -x Ice 2>/dev/null || true
+  sleep 1
+fi
 
 echo "=== Installing ==="
-rm -rf /Applications/Ice.app
-cp -R "$INSTALL_APP_PATH" /Applications/Ice.app
+if [[ -e "$DESTINATION_APP_PATH" ]]; then
+  backup_path="${DESTINATION_APP_PATH%.app}-backup-$(date +%Y%m%d-%H%M%S).app"
+  [[ ! -e "$backup_path" ]] || { echo "ERROR: Backup already exists: $backup_path"; exit 1; }
+  mv "$DESTINATION_APP_PATH" "$backup_path"
+  echo "  Previous app preserved at $backup_path"
+fi
+ditto --norsrc --noextattr "$INSTALL_APP_PATH" "$DESTINATION_APP_PATH"
 codesign_installed_app
 
-echo "=== Launching ==="
-open /Applications/Ice.app
+if [[ "${ICE_INSTALL_NO_LAUNCH:-0}" != "1" ]]; then
+  echo "=== Launching ==="
+  open "$DESTINATION_APP_PATH"
+fi
 
 if [[ "$SIGNING_IDENTITY" == "-" ]]; then
   echo "=== Done! Existing permissions were left in place, but this app is ad-hoc signed ==="

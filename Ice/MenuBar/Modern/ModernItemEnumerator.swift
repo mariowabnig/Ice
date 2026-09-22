@@ -19,6 +19,28 @@ public struct ModernMenuBarItem: Identifiable, Equatable, Sendable {
     public let pid: pid_t
 }
 
+public struct ModernMenuBarSnapshot: Sendable {
+    public let items: [ModernMenuBarItem]
+    public let isReadable: Bool
+    public var hasReadErrors = false
+
+    var canVerifyVisibility: Bool {
+        isReadable && !hasReadErrors && !items.isEmpty && hasVerificationAnchor
+    }
+
+    var hasVerificationAnchor: Bool {
+        items.contains { item in
+            item.id.bundleID == "com.apple.MenuBarAgent" && (
+                item.id.systemItem != nil ||
+                item.id.isUserSwitcher ||
+                item.id.title == "com.apple.menuextra.controlcenter"
+            )
+        }
+    }
+
+    static let unreadable = Self(items: [], isReadable: false)
+}
+
 /// Bundle attribution of an item's owning process.
 private struct HostBundle {
     let id: String
@@ -35,22 +57,31 @@ public actor ModernItemEnumerator {
 
     private var agentElement: AXUIElement?
     private var agentPID: pid_t = 0
+    private var snapshotHadReadErrors = false
 
     /// Correlates each observed item group to a stable agent tag. Tags come
     /// from the positions plist domain (`status:<bundle>::<title>`); we build
     /// the same shape from the AX tree so both sources agree.
     public func snapshotItems() -> [ModernMenuBarItem] {
-        guard let agent = resolveAgent() else { return [] }
+        snapshot().items
+    }
+
+    public func snapshot() -> ModernMenuBarSnapshot {
+        snapshotHadReadErrors = false
+        guard let agent = resolveAgent() else { return .unreadable }
         guard let windows = copyAttribute(agent, kAXChildrenAttribute) as? [AXUIElement] else {
-            return []
+            return .unreadable
         }
         var byID: [ModernItemID: ModernMenuBarItem] = [:]
         var order: [ModernItemID] = []
+        var readWindowChildren = false
         for window in windows {
             guard role(of: window) == "AXWindow" else { continue }
             guard let groups = copyAttribute(window, kAXChildrenAttribute) as? [AXUIElement] else {
+                snapshotHadReadErrors = true
                 continue
             }
+            readWindowChildren = true
             for group in groups {
                 guard let item = describeGroup(group) else { continue }
                 if let existing = byID[item.id] {
@@ -67,7 +98,12 @@ public actor ModernItemEnumerator {
                 }
             }
         }
-        return order.compactMap { byID[$0] }
+        guard readWindowChildren else { return .unreadable }
+        return ModernMenuBarSnapshot(
+            items: order.compactMap { byID[$0] },
+            isReadable: true,
+            hasReadErrors: snapshotHadReadErrors
+        )
     }
 
     private func isMainDisplayFrame(_ frame: CGRect) -> Bool {
@@ -94,6 +130,7 @@ public actor ModernItemEnumerator {
 
     private func describeGroup(_ group: AXUIElement) -> ModernMenuBarItem? {
         guard let frame = frame(of: group) else {
+            snapshotHadReadErrors = true
             logDrop("no AXFrame", pid: nil, role: role(of: group))
             return nil
         }
@@ -269,7 +306,11 @@ public actor ModernItemEnumerator {
     }
 
     private func children(of element: AXUIElement) -> [AXUIElement] {
-        copyAttribute(element, kAXChildrenAttribute) as? [AXUIElement] ?? []
+        guard let children = copyAttribute(element, kAXChildrenAttribute) as? [AXUIElement] else {
+            snapshotHadReadErrors = true
+            return []
+        }
+        return children
     }
 
     private func role(of element: AXUIElement) -> String {

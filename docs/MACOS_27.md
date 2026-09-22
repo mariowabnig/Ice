@@ -6,7 +6,7 @@ On macOS 27.0 (26A428), Ice logged `Missing control item for hidden section` and
 
 ## New backend
 
-`AppState.modernMenuBarManager` owns the macOS 27 path. macOS 14–26 retain the existing window-based implementation.
+`AppState.modernMenuBarManager` owns the macOS 27 path. macOS 14–26 use the upstream 0.11.13-dev.2 implementation, including its menu bar item service on macOS 26.
 
 - `ModernItemEnumerator` walks MenuBarAgent's Accessibility tree off the main actor, with bounded messaging timeouts, resolves app identities, and deduplicates display instances.
 - The new layout editor displays application icons and names without requiring Screen Recording. Search filters the editor. It never fabricates CGWindowIDs for scene-based items.
@@ -14,7 +14,7 @@ On macOS 27.0 (26A428), Ice logged `Missing control item for hidden section` and
 - Dropping into a section changes the app's assignment. Third-party hiding is per application, so all of an app's status items share one section. Supported core system controls use separate `system:<raw identifier>` assignment keys; existing app assignments still decode unchanged. Assignments are stored separately under `Defaults.Key.modernMenuBarLayout`; existing settings are not overwritten.
 - Opening the editor temporarily reveals items; leaving it restores concealment. Ice's section actions and rehide timers use the new backend.
 - Section assignments save immediately, but the menu bar continues showing all items while Menu Bar Layout is open. Switch to General or Menu Bar Appearance, or close Settings, to see the saved hiding behavior. Returning to Menu Bar Layout reveals items again without changing any assignments.
-- Concealment uses a process-bound MenuBarClientCore assertion. Errors/timeouts release the assertion. Quitting Ice releases it too. The allowlist includes other running applications, and refresh updates it when applications launch or quit.
+- Concealment uses a process-bound MenuBarClientCore assertion. A missing completion callback alone no longer releases the assertion. Ice verifies a complete, nonempty Accessibility snapshot, keeps an unverified assertion when reads are temporarily unavailable, and retries confirmed failures with bounded backoff. Quitting Ice releases it. The allowlist includes other running applications, and refresh updates it when applications launch or quit.
 - Scene dividers no longer expand to enormous widths. Search opens the new searchable editor. On macOS 27 the old separate Ice Bar falls back to the system menu bar, and the ineffective legacy spacing/relaunch control is not offered.
 
 ## Current limits
@@ -62,8 +62,36 @@ BetterTouchTool's Hidden assignment was confirmed in the running editor and save
 
 Before shipping, the Debug build and all 17 macOS tests passed again using Xcode's own `xcodebuild` with `-destination 'platform=macOS,arch=arm64' CODE_SIGNING_ALLOWED=NO build test`. The existing CoreDevice/CoreSimulator environment warnings did not prevent the macOS build or test run. SwiftLint was not installed locally, so local lint verification was unavailable.
 
+## Second-Mac verification — 2026-09-16
+
+Pulled `f860519` into the clean checkout on the second Mac (macOS 27.0, build `26A428`). The compatibility files are present in that commit. Added a prominent editor notice explaining that assignments save immediately, switching to General or closing Settings restores saved hiding behavior, and reopening the editor temporarily reveals all sections again.
+
+Full Xcode is absent on this Mac. The normal `xcodebuild` build/test commands cannot run. GitHub Actions run [35138416970](https://github.com/mariowabnig/Ice/actions/runs/35138416970) successfully built the exact commit. A local arm64 executable including the notice was then compiled and linked with Command Line Tools Swift 6.4, the installed macOS 26.5 SDK, and the pinned cached dependencies. Only two design-time `#Preview` registrations were omitted in temporary source copies because CLT lacks Xcode's preview plugin; runtime source was retained. Build commands and logs are under `build/macos27-local/`.
+
+All 17 existing model/geometry test bodies passed in a standalone Swift assertion harness against unchanged production model sources. This is not an XCTest run: CLT also lacks the XCTest module. The complete Xcode-hosted suite still needs full Xcode.
+
+The original installed app and exported preferences are backed up under `build/backups/2026-09-16-before-macos27/`. The local executable was packaged with resources from the exact-commit CI artifact and signed with the existing Ice Local Development identity. Its designated requirement matches the previous app, and strict recursive signature verification passed. Existing Accessibility and Screen Recording permissions remained granted; no permission reset or user approval prompt was needed.
+
+Live checks confirmed that the installed editor discovers third-party applications and system controls, that the new notice renders correctly, and that the search field filters items. BetterTouchTool is not installed/running on this Mac and produced no search matches, so its specific Hidden assignment cannot be verified here.
+
+To test concealment without changing another application's settings, created a temporary native status-item app (`local.ice.compatibility-check`, label `Ice QA`). The installed Ice app discovered it, and its context menu assigned it to Hidden. Reading saved preferences confirmed immediate persistence while MenuBarAgent's Accessibility tree still contained the item with the editor open. Switching to General removed it from that tree while Wi-Fi, Control Center and Itsycal remained. Returning to the editor revealed it with the Hidden assignment unchanged. Closing Settings concealed it; reopening Ice from Finder restored Settings and revealed it. Reopening minimized Settings also worked. The fixture was quit and its test-only assignment removed afterward.
+
+The installed app is running the local build with the notice. User settings were preserved: icon/appearance data differed only in JSON serialization order, and window geometry updated normally. No user item assignments were changed. BetterTouchTool itself, physical drag/reverse-drag, section toggling through the menu bar/hotkeys, additional displays, and missing-permission startup have not been exercised on this second Mac. The existing reorder success check only verifies source-before-target; it can miss a rejected move if that relative order already held before dragging.
+
 ## Source attribution
 
 The bounded AX enumerator, system identifier mappings and Objective-C MenuBarClientCore shim are adapted from [fif7y/Pelmet](https://github.com/fif7y/pelmet), revision `76db5715991a82e4583f93c360fba9807750d040`, licensed under GNU GPL v3. Ice is also GPL v3. The copied portions retain their original descriptive comments, with type/function names and logging adapted to Ice. The original GPL license is retained in `docs/licenses/Pelmet-GPL-3.0.txt`. The manager, editor, persistence model, and integration are specific to this fork.
 
 Thaw's macOS 27 release notes were useful context, but the inspected public Thaw tag did not contain the advertised new backend; it was not used as the basis for this implementation.
+
+## Beta integration and hiding repair — 2026-09-22
+
+The official `0.11.13-dev.2` beta is integrated with this fork's macOS 27 backend, auxiliary overlay discovery/capture, reservation geometry, and settings behavior. The custom build is labelled `0.11.13-dev.2-macos27.1` (build `2026092201`). Sparkle does not start for a custom build; About and Check for Updates open this fork's update page so public releases cannot silently replace its additions.
+
+Hiding now uses generation-scoped verification instead of treating a missing private-API callback as failure. Late callbacks cannot affect newer plans; automatic retries retain attempt history and stop after three retries. General shows the current state and a Retry hiding action. Timed rehide starts when the pointer leaves the live menu bar/reveal strip (or immediately when revealed while the pointer is already away), and delayed work rechecks the user's preference.
+
+`build-and-install.sh` signs nested beta services before the containing app, verifies the signature recursively, and preserves the previous app. For staging without stopping or opening the running app, set `ICE_INSTALL_APP_PATH`, `ICE_INSTALL_NO_STOP=1`, and `ICE_INSTALL_NO_LAUNCH=1`; `ICE_INSTALL_SOURCE` may specify an already-built app. A failure to reuse an existing signing identity stops installation instead of silently changing its permission identity.
+
+Final validation on 2026-09-22: Debug and Release builds and `build-for-testing` pass. The safe `scripts/run-modern-visibility-standalone-tests.sh` harness passes 12 grouped behavior checks against production sources; it does not launch the app or alter preferences. Hosted XCTest was compiled but not executed during this repair. SwiftLint remains unavailable, and the Xcode installation prints CoreDevice/CoreSimulator warnings.
+
+Live installation reused the existing Ice Local Development certificate and preserved the designated requirement and all nine saved application assignments. General reports active hiding; MenuBarAgent no longer exposes Pure Paste while concealed. Opening Menu Bar Layout restores it and displays the running Always-Hidden apps, and leaving the editor conceals it again. The user's AutoRehide setting is enabled with Timed strategy and 15 seconds. The final ControlItem port keeps legacy dividers at zero width on macOS 27 and decouples section hotkeys from legacy divider visibility. Native menu-button/Carbon-shortcut automation has hosted-coordinate limitations in the current UI driver; do not infer physical shortcut or exact pointer-timing verification from the unit/build results. Additional displays and actual sleep/wake were not exercised.

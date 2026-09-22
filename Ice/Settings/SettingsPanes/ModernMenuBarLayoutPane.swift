@@ -11,8 +11,17 @@ struct ModernMenuBarLayoutPane: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 Text("Arrange your menu bar items").font(.title2)
-                Text("Drag within a section to reorder items, or into another section to choose when they appear. Items are temporarily revealed while this editor is open.")
+                Text("Drag within a section to reorder items, or into another section to choose when they appear.")
                     .foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 4) {
+                    Label("All items are temporarily revealed", systemImage: "eye")
+                        .font(.headline)
+                    Text("Assignments save immediately. To see your saved hiding behavior, switch to General or close Settings. Returning here reveals all items again without changing their sections.")
+                        .font(.callout)
+                }
+                .padding(12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(.tint.opacity(0.08), in: RoundedRectangle(cornerRadius: 9))
                 TextField("Find an app or menu bar item", text: $search)
                     .textFieldStyle(.roundedBorder)
                 Text("App icons identify items when individual menu bar previews are unavailable. Icons from the same app hide together. Wi-Fi, Battery and other supported system controls can be hidden separately.")
