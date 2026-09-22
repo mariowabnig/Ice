@@ -95,3 +95,9 @@ Hiding now uses generation-scoped verification instead of treating a missing pri
 Final validation on 2026-09-22: Debug and Release builds and `build-for-testing` pass. The safe `scripts/run-modern-visibility-standalone-tests.sh` harness passes 12 grouped behavior checks against production sources; it does not launch the app or alter preferences. Hosted XCTest was compiled but not executed during this repair. SwiftLint remains unavailable, and the Xcode installation prints CoreDevice/CoreSimulator warnings.
 
 Live installation reused the existing Ice Local Development certificate and preserved the designated requirement and all nine saved application assignments. General reports active hiding; MenuBarAgent no longer exposes Pure Paste while concealed. Opening Menu Bar Layout restores it and displays the running Always-Hidden apps, and leaving the editor conceals it again. The user's AutoRehide setting is enabled with Timed strategy and 15 seconds. The final ControlItem port keeps legacy dividers at zero width on macOS 27 and decouples section hotkeys from legacy divider visibility. Native menu-button/Carbon-shortcut automation has hosted-coordinate limitations in the current UI driver; do not infer physical shortcut or exact pointer-timing verification from the unit/build results. Additional displays and actual sleep/wake were not exercised.
+
+The pre-ship adversarial review hardened Accessibility error handling: failed
+transport, role and process reads cannot establish that an item was hidden.
+Absent optional attributes remain acceptable. The lifecycle owns the only
+verification generation counter. The standalone production-code harness now
+covers 15 scenarios, including AX error classification and partial snapshots.

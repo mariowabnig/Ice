@@ -5,6 +5,9 @@ All notable changes to Ice are tracked here retroactively from the available git
 ## Unreleased
 
 ### macOS 27 compatibility
+- Integrate the official 0.11.13-dev.2 beta while preserving custom macOS 27, Portworth and auxiliary-item behavior; protect this build from automatic upstream replacement.
+- Verify hiding from complete Accessibility snapshots, retain assertions through temporary unreadable states, reject stale callbacks and bound automatic retries. Treat transport, role and PID read failures as incomplete evidence.
+- Start timed rehide when the pointer is away from the menu bar, including reveals triggered away from it; preserve Always-Hidden toggle settings and section hotkeys.
 - Document and verify that Menu Bar Layout temporarily reveals all items; leaving the pane restores saved hiding assignments, including BetterTouchTool.
 - Restore hiding for supported system controls such as Wi-Fi, add grouped hiding for User, and let cross-section drops assign visibility without requiring a physical menu bar move.
 - Add an Accessibility-based menu bar editor with app-icon fallbacks, search, verified native reordering, and per-app section assignments on macOS 27.

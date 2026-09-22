@@ -141,7 +141,10 @@ public actor ModernItemEnumerator {
                 // Third-party item: owning app nested right in the tree.
                 let appName = copyAttribute(child, kAXTitleAttribute) as? String
                 var appPID: pid_t = 0
-                AXUIElementGetPid(child, &appPID)
+                guard AXUIElementGetPid(child, &appPID) == .success else {
+                    snapshotHadReadErrors = true
+                    continue
+                }
                 guard let host = hostBundle(ofPID: appPID) else {
                     logDrop("no bundle id for AXApplication", pid: appPID, role: "AXApplication")
                     return nil
@@ -301,7 +304,10 @@ public actor ModernItemEnumerator {
 
     private func pid(of element: AXUIElement) -> pid_t? {
         var pid: pid_t = 0
-        AXUIElementGetPid(element, &pid)
+        guard AXUIElementGetPid(element, &pid) == .success else {
+            snapshotHadReadErrors = true
+            return nil
+        }
         return pid > 0 ? pid : nil
     }
 
@@ -314,7 +320,11 @@ public actor ModernItemEnumerator {
     }
 
     private func role(of element: AXUIElement) -> String {
-        copyAttribute(element, kAXRoleAttribute) as? String ?? ""
+        guard let role = copyAttribute(element, kAXRoleAttribute) as? String else {
+            snapshotHadReadErrors = true
+            return ""
+        }
+        return role
     }
 
     /// `role(of:)` reports a missing role as "", so the `?? "?"` the log
@@ -332,9 +342,18 @@ public actor ModernItemEnumerator {
         return rect
     }
 
+    /// Optional attributes may be absent; transport failures make the snapshot
+    /// incomplete, so a missing item cannot be mistaken for successful hiding.
+    nonisolated static func isIncompleteRead(_ error: AXError) -> Bool {
+        error != .success && error != .attributeUnsupported && error != .noValue
+    }
+
     private func copyAttribute(_ element: AXUIElement, _ name: String) -> CFTypeRef? {
         var value: CFTypeRef?
-        AXUIElementCopyAttributeValue(element, name as CFString, &value)
-        return value
+        let error = AXUIElementCopyAttributeValue(element, name as CFString, &value)
+        if Self.isIncompleteRead(error) {
+            snapshotHadReadErrors = true
+        }
+        return error == .success ? value : nil
     }
 }

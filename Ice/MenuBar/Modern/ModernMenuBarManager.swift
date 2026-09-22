@@ -23,7 +23,6 @@ final class ModernMenuBarManager: ObservableObject {
     private let visibilityRetryPolicy = ModernVisibilityRetryPolicy()
     private var visibilityRetryTask: Task<Void, Never>?
     private var awaitingVisibility = false
-    private var visibilityGeneration = 0
     private var visibilityLifecycle = ModernVisibilityLifecycle()
     private var lastObservedIDs = Set<ModernItemID>()
 
@@ -56,7 +55,7 @@ final class ModernMenuBarManager: ObservableObject {
         }
         lastObservedIDs = Set(snapshot.items.map(\.id))
         if awaitingVisibility {
-            finishVisibilityVerification(snapshot, generation: visibilityGeneration, plan: appliedVisibility, allowFailure: false)
+            finishVisibilityVerification(snapshot, generation: visibilityLifecycle.generation, plan: appliedVisibility, allowFailure: false)
         } else if assertion != nil, appliedVisibility.requiresAssertion, !isEditing {
             checkActiveVisibility(snapshot, plan: appliedVisibility)
         }
@@ -175,7 +174,6 @@ final class ModernMenuBarManager: ObservableObject {
             return
         }
         visibilityLifecycle.markIdle()
-        visibilityGeneration = visibilityLifecycle.generation
         let previousAssertion = assertion
         awaitingVisibility = false
         guard effective.requiresAssertion else {
@@ -199,7 +197,6 @@ final class ModernMenuBarManager: ObservableObject {
             return
         }
         let activationGeneration = visibilityLifecycle.beginActivation()
-        visibilityGeneration = activationGeneration
         NSLog("[Ice ModernMenuBar] activation generation=%ld hiddenApps=%ld hiddenSystemItems=%ld", activationGeneration, effective.bundles.count, effective.systemItems.count)
         guard let newAssertion = iceModern_activateAssertion(config, { [weak self] error in
             Task { @MainActor in
@@ -211,7 +208,6 @@ final class ModernMenuBarManager: ObservableObject {
             }
         }) as AnyObject? else {
             visibilityLifecycle.markFailed(message: "Menu bar hiding is unavailable on this macOS build.")
-            visibilityGeneration = visibilityLifecycle.generation
             recordVisibilityFailure(effective, message: "Menu bar hiding is unavailable on this macOS build.")
             return
         }
@@ -244,7 +240,7 @@ final class ModernMenuBarManager: ObservableObject {
         plan: ModernVisibilityPlan,
         allowFailure: Bool = true
     ) {
-        guard visibilityGeneration == generation, awaitingVisibility, appliedVisibility == plan else { return }
+        guard visibilityLifecycle.generation == generation, awaitingVisibility, appliedVisibility == plan else { return }
         let result = ModernVisibilityVerifier.verify(plan, in: snapshot)
         switch visibilityLifecycle.verify(generation: generation, result: result, allowFailure: allowFailure) {
         case .confirmed:
@@ -263,7 +259,6 @@ final class ModernMenuBarManager: ObservableObject {
             visibilityStatus = "Menu bar hiding is active, but Ice could not verify it."
             errorMessage = "Ice could not read a complete macOS menu bar snapshot to confirm hiding."
         case .failed(let message):
-            visibilityGeneration = visibilityLifecycle.generation
             awaitingVisibility = false
             iceModern_invalidateAssertion(assertion)
             assertion = nil
@@ -284,7 +279,6 @@ final class ModernMenuBarManager: ObservableObject {
         case .keepWaiting, .activeButUnverified, .ignoredStale:
             return
         case .failed(let message):
-            visibilityGeneration = visibilityLifecycle.generation
             iceModern_invalidateAssertion(assertion)
             assertion = nil
             appliedVisibility = ModernVisibilityPlan()
@@ -357,7 +351,6 @@ final class ModernMenuBarManager: ObservableObject {
         visibilityRetryTask?.cancel()
         visibilityRetryTask = nil
         visibilityLifecycle.markIdle()
-        visibilityGeneration = visibilityLifecycle.generation
         iceModern_invalidateAssertion(assertion)
         assertion = nil
         appliedVisibility = ModernVisibilityPlan()

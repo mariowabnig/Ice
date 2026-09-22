@@ -11,6 +11,7 @@ BIN="$TMP_ROOT/modern-visibility-tests"
 
 cat > "$MAIN" <<'SWIFT'
 import CoreGraphics
+import ApplicationServices
 import Foundation
 
 @discardableResult
@@ -72,6 +73,15 @@ func systemAnchor() -> ModernMenuBarItem {
 
 func system(_ name: String) -> ModernItemID {
     .status(bundle: "com.apple.MenuBarAgent", title: "com.apple.menuextra.\(name)")
+}
+
+test("Accessibility transport failures cannot verify hiding") {
+    for error: AXError in [.cannotComplete, .invalidUIElement, .apiDisabled, .failure] {
+        check(ModernItemEnumerator.isIncompleteRead(error), "transport error must mark snapshot incomplete")
+    }
+    for error: AXError in [.success, .attributeUnsupported, .noValue] {
+        check(!ModernItemEnumerator.isIncompleteRead(error), "absent optional attribute is not a transport error")
+    }
 }
 
 test("readable anchored snapshot confirms hidden targets are gone") {
