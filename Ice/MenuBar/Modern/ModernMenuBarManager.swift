@@ -44,31 +44,36 @@ final class ModernMenuBarManager: ObservableObject {
         isRefreshing = true
         defer { isRefreshing = false }
         let snapshot = await enumerator.snapshot()
+        if snapshot.isReadable, !snapshot.items.isEmpty {
+            updateKnownItems(from: snapshot)
+        }
         guard snapshot.canVerifyVisibility else {
             visibilityStatus = awaitingVisibility
-                ? "Waiting for macOS to provide a readable menu bar snapshot..."
+                ? "Waiting for macOS to provide a complete menu bar snapshot..."
                 : visibilityStatus
             applyVisibility()
             return
         }
-        let observed = snapshot.items
-        lastObservedIDs = Set(observed.map(\.id))
+        lastObservedIDs = Set(snapshot.items.map(\.id))
         if awaitingVisibility {
             finishVisibilityVerification(snapshot, generation: visibilityGeneration, plan: appliedVisibility, allowFailure: false)
         } else if assertion != nil, appliedVisibility.requiresAssertion, !isEditing {
             checkActiveVisibility(snapshot, plan: appliedVisibility)
         }
-        // Concealed items leave AX entirely. Retain their last identity while the
-        // owning process lives; never mistake a temporary absence for deletion.
-        let observedIDs = Set(observed.map(\.id))
-        let retained = items.filter {
-            appliedVisibility.conceals($0.id) &&
-            !observedIDs.contains($0.id) &&
-            NSRunningApplication(processIdentifier: $0.pid)?.isTerminated == false
-        }
-        items = (observed + retained).filter { $0.id.bundleID != Constants.bundleIdentifier }
-            .sorted { $0.frame.minX < $1.frame.minX }
         applyVisibility()
+    }
+
+    private func updateKnownItems(from snapshot: ModernMenuBarSnapshot) {
+        items = ModernItemDiscovery.mergedItems(
+            previous: items,
+            observed: snapshot.items,
+            appliedVisibility: appliedVisibility,
+            retainAllUnobserved: !snapshot.canVerifyVisibility,
+            ownBundle: Constants.bundleIdentifier,
+            isAlive: { pid in
+                NSRunningApplication(processIdentifier: pid)?.isTerminated == false
+            }
+        )
     }
 
     func beginEditing() {

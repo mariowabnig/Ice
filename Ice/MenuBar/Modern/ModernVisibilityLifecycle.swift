@@ -152,6 +152,26 @@ struct ModernVisibilityLifecycle: Equatable {
     }
 }
 
+enum ModernItemDiscovery {
+    static func mergedItems(
+        previous: [ModernMenuBarItem],
+        observed: [ModernMenuBarItem],
+        appliedVisibility: ModernVisibilityPlan,
+        retainAllUnobserved: Bool,
+        ownBundle: String,
+        isAlive: (pid_t) -> Bool
+    ) -> [ModernMenuBarItem] {
+        let observedIDs = Set(observed.map(\.id))
+        let retained = previous.filter { item in
+            guard !observedIDs.contains(item.id), isAlive(item.pid) else { return false }
+            return retainAllUnobserved || appliedVisibility.conceals(item.id)
+        }
+        return (observed + retained)
+            .filter { $0.id.bundleID != ownBundle }
+            .sorted { $0.frame.minX < $1.frame.minX }
+    }
+}
+
 struct ModernMoveVerificationItem: Equatable {
     var id: ModernItemID
     var midX: CGFloat

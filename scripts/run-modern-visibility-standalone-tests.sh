@@ -50,13 +50,13 @@ func test(_ name: String, _ body: () throws -> Void) rethrows {
     print("✓ \(name)")
 }
 
-func item(_ bundle: String, title: String = "Item") -> ModernMenuBarItem {
+func item(_ bundle: String, title: String = "Item", x: CGFloat = 0, pid: pid_t = 100) -> ModernMenuBarItem {
     ModernMenuBarItem(
         id: .status(bundle: bundle, title: title),
-        frame: CGRect(x: 0, y: 0, width: 22, height: 22),
+        frame: CGRect(x: x, y: 0, width: 22, height: 22),
         appName: bundle,
         hostIsBundleless: false,
-        pid: 100
+        pid: pid
     )
 }
 
@@ -110,6 +110,42 @@ test("visible concealed target is reported") {
     let hidden = item("example.hidden")
     let snapshot = ModernMenuBarSnapshot(items: [hidden, systemAnchor()], isReadable: true)
     checkEqual(ModernVisibilityVerifier.verify(plan, in: snapshot), .stillVisible([hidden.id]), "visible concealed target should fail verification")
+}
+
+test("partial discovery accepts new observed items and retains alive previous items") {
+    let retainedVisible = item("example.visible", x: 30, pid: 101)
+    let retainedHidden = item("example.hidden", x: 20, pid: 102)
+    let droppedDead = item("example.dead", x: 10, pid: 103)
+    let observedNew = item("example.new", x: 40, pid: 104)
+    let ownItem = item("ice", x: 50, pid: 105)
+    var plan = ModernVisibilityPlan()
+    plan.bundles = ["example.hidden"]
+    let merged = ModernItemDiscovery.mergedItems(
+        previous: [retainedVisible, retainedHidden, droppedDead],
+        observed: [observedNew, ownItem],
+        appliedVisibility: plan,
+        retainAllUnobserved: true,
+        ownBundle: "ice",
+        isAlive: { $0 != droppedDead.pid }
+    )
+    checkEqual(merged.map(\.id), [retainedHidden.id, retainedVisible.id, observedNew.id], "partial discovery should retain alive previous items and accept new observed items")
+}
+
+test("complete discovery only retains concealed alive items") {
+    let visible = item("example.visible", x: 10, pid: 101)
+    let hidden = item("example.hidden", x: 20, pid: 102)
+    let observed = item("example.observed", x: 30, pid: 103)
+    var plan = ModernVisibilityPlan()
+    plan.bundles = ["example.hidden"]
+    let merged = ModernItemDiscovery.mergedItems(
+        previous: [visible, hidden],
+        observed: [observed],
+        appliedVisibility: plan,
+        retainAllUnobserved: false,
+        ownBundle: "ice",
+        isAlive: { _ in true }
+    )
+    checkEqual(merged.map(\.id), [hidden.id, observed.id], "complete discovery should prune ordinary missing visible items")
 }
 
 test("missing callback can still confirm from snapshot") {

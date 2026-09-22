@@ -2,13 +2,13 @@ import XCTest
 @testable import Ice
 
 final class ModernVisibilityLifecycleTests: XCTestCase {
-    private func item(_ bundle: String, title: String = "Item") -> ModernMenuBarItem {
+    private func item(_ bundle: String, title: String = "Item", x: CGFloat = 0, pid: pid_t = 100) -> ModernMenuBarItem {
         ModernMenuBarItem(
             id: .status(bundle: bundle, title: title),
-            frame: CGRect(x: 0, y: 0, width: 22, height: 22),
+            frame: CGRect(x: x, y: 0, width: 22, height: 22),
             appName: bundle,
             hostIsBundleless: false,
-            pid: 100
+            pid: pid
         )
     }
 
@@ -59,6 +59,46 @@ final class ModernVisibilityLifecycleTests: XCTestCase {
             hasReadErrors: true
         )
         XCTAssertEqual(ModernVisibilityVerifier.verify(plan, in: snapshot), .unreadable)
+    }
+
+    func testPartialDiscoveryRetainsAliveUnobservedItemsAndAcceptsNewObservedItems() {
+        let retainedVisible = item("example.visible", x: 30, pid: 101)
+        let retainedHidden = item("example.hidden", x: 20, pid: 102)
+        let droppedDead = item("example.dead", x: 10, pid: 103)
+        let observedNew = item("example.new", x: 40, pid: 104)
+        let ownItem = item(Constants.bundleIdentifier, x: 50, pid: 105)
+        var plan = ModernVisibilityPlan()
+        plan.bundles = ["example.hidden"]
+
+        let merged = ModernItemDiscovery.mergedItems(
+            previous: [retainedVisible, retainedHidden, droppedDead],
+            observed: [observedNew, ownItem],
+            appliedVisibility: plan,
+            retainAllUnobserved: true,
+            ownBundle: Constants.bundleIdentifier,
+            isAlive: { $0 != droppedDead.pid }
+        )
+
+        XCTAssertEqual(merged.map(\.id), [retainedHidden.id, retainedVisible.id, observedNew.id])
+    }
+
+    func testCompleteDiscoveryOnlyRetainsConcealedAliveItems() {
+        let visible = item("example.visible", x: 10, pid: 101)
+        let hidden = item("example.hidden", x: 20, pid: 102)
+        let observed = item("example.observed", x: 30, pid: 103)
+        var plan = ModernVisibilityPlan()
+        plan.bundles = ["example.hidden"]
+
+        let merged = ModernItemDiscovery.mergedItems(
+            previous: [visible, hidden],
+            observed: [observed],
+            appliedVisibility: plan,
+            retainAllUnobserved: false,
+            ownBundle: Constants.bundleIdentifier,
+            isAlive: { _ in true }
+        )
+
+        XCTAssertEqual(merged.map(\.id), [hidden.id, observed.id])
     }
 
     func testMissingCallbackCanStillConfirmFromSnapshot() {
