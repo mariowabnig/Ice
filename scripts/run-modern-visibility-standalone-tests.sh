@@ -75,6 +75,30 @@ func system(_ name: String) -> ModernItemID {
     .status(bundle: "com.apple.MenuBarAgent", title: "com.apple.menuextra.\(name)")
 }
 
+test("auto-hidden menu bars own only the reveal edge while retracted") {
+    let screen = CGRect(x: -1512, y: 200, width: 1512, height: 982)
+    let hidden = ModernMenuBarGeometry.interactionFrame(screen: screen, height: 38, isRetracted: true)
+    checkEqual(hidden.height, 1, "retracted menu bar must not cover application toolbar")
+    check(!hidden.contains(CGPoint(x: -800, y: 1160)), "toolbar is outside retracted bar")
+    check(hidden.contains(CGPoint(x: -800, y: 1181.5)), "reveal edge remains reachable")
+    let shown = ModernMenuBarGeometry.interactionFrame(screen: screen, height: 38, isRetracted: false)
+    check(shown.contains(CGPoint(x: -800, y: 1160)), "notched menu bar uses full visible height")
+}
+
+test("sliding and retracted bars cannot establish assertion success or failure") {
+    let display = CGRect(x: -1920, y: -200, width: 1920, height: 1080)
+    let bar = CGRect(x: -1920, y: -200, width: 1920, height: 26)
+    check(ModernMenuBarGeometry.isPresented(bar, on: [display]), "secondary display bar is presented")
+    check(!ModernMenuBarGeometry.isPresented(bar.offsetBy(dx: 0, dy: -12), on: [display]), "partial reveal is not settled")
+    check(!ModernMenuBarGeometry.isPresented(bar.offsetBy(dx: 0, dy: -26), on: [display]), "retracted bar is not presented")
+    var plan = ModernVisibilityPlan()
+    plan.bundles = ["example.hidden"]
+    for observed in [[systemAnchor()], [item("example.hidden"), systemAnchor()]] {
+        let snapshot = ModernMenuBarSnapshot(items: observed, isReadable: true, isMenuBarPresented: false)
+        checkEqual(ModernVisibilityVerifier.verify(plan, in: snapshot), .unreadable, "offscreen contents cannot prove visibility")
+    }
+}
+
 test("Accessibility transport failures cannot verify hiding") {
     for error: AXError in [.cannotComplete, .invalidUIElement, .apiDisabled, .failure] {
         check(ModernItemEnumerator.isIncompleteRead(error), "transport error must mark snapshot incomplete")

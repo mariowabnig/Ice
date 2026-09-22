@@ -28,13 +28,21 @@ public struct ModernMenuBarSnapshot: Sendable {
     public let items: [ModernMenuBarItem]
     public let isReadable: Bool
     public var hasReadErrors = false
+    /// False only when geometry positively establishes retraction. Unknown
+    /// presentation keeps normal unreadable-snapshot retry handling active.
+    public var isMenuBarPresented = true
+    /// Raw observations from fully presented displays only. Cached off-screen
+    /// groups still belong in the editor, but cannot verify live concealment.
+    public var presentedItems: [ModernMenuBarItem]?
+
+    var verificationItems: [ModernMenuBarItem] { presentedItems ?? items }
 
     var canVerifyVisibility: Bool {
-        isReadable && !hasReadErrors && !items.isEmpty && hasVerificationAnchor
+        isReadable && isMenuBarPresented && !hasReadErrors && !items.isEmpty && hasVerificationAnchor
     }
 
     var hasVerificationAnchor: Bool {
-        items.contains { item in
+        verificationItems.contains { item in
             item.id.bundleID == "com.apple.MenuBarAgent" && (
                 item.id.systemItem != nil ||
                 item.id.isUserSwitcher ||
@@ -80,8 +88,25 @@ public actor ModernItemEnumerator {
         var byID: [ModernItemID: ModernMenuBarItem] = [:]
         var order: [ModernItemID] = []
         var readWindowChildren = false
+        var hasPresentedMenuBar = false
+        var presentationHadReadErrors = false
+        var presentedItems: [ModernMenuBarItem] = []
+        var displayCount: UInt32 = 0
+        guard CGGetActiveDisplayList(0, nil, &displayCount) == .success, displayCount > 0 else { return .unreadable }
+        var displays = [CGDirectDisplayID](repeating: 0, count: Int(displayCount))
+        guard CGGetActiveDisplayList(displayCount, &displays, &displayCount) == .success, displayCount > 0 else { return .unreadable }
+        let displayBounds = displays.prefix(Int(displayCount)).map { CGDisplayBounds($0) }
         for window in windows {
             guard role(of: window) == "AXWindow" else { continue }
+            let isPresented: Bool
+            if let windowFrame = frame(of: window), ModernMenuBarOccupancy.isUsable(windowFrame) {
+                isPresented = ModernMenuBarGeometry.isPresented(windowFrame, on: displayBounds)
+            } else {
+                isPresented = false
+                presentationHadReadErrors = true
+                snapshotHadReadErrors = true
+            }
+            hasPresentedMenuBar = hasPresentedMenuBar || isPresented
             guard let groups = copyAttribute(window, kAXChildrenAttribute) as? [AXUIElement] else {
                 snapshotHadReadErrors = true
                 continue
@@ -89,6 +114,7 @@ public actor ModernItemEnumerator {
             readWindowChildren = true
             for group in groups {
                 guard let item = describeGroup(group) else { continue }
+                if isPresented { presentedItems.append(item) }
                 if let existing = byID[item.id] {
                     // The same item appears once per display. Prefer the
                     // main-display occurrence (y ≈ 0 in CG top-left coords) so
@@ -107,14 +133,16 @@ public actor ModernItemEnumerator {
         return ModernMenuBarSnapshot(
             items: order.compactMap { byID[$0] },
             isReadable: true,
-            hasReadErrors: snapshotHadReadErrors
+            hasReadErrors: snapshotHadReadErrors,
+            isMenuBarPresented: hasPresentedMenuBar || presentationHadReadErrors,
+            presentedItems: presentedItems
         )
     }
 
     /// Fresh, bounded occupancy for click/hover decisions. Do not resolve app
     /// identities or deduplicate: unknown items and every display still occupy
     /// space, including Ice's own icon and the system overflow control.
-    func snapshotOccupancy(deadline: TimeInterval) -> ModernMenuBarOccupancy {
+    func snapshotOccupancy(at point: CGPoint, deadline: TimeInterval) -> ModernMenuBarOccupancy {
         var snapshot = ModernMenuBarOccupancy()
         guard !Task.isCancelled, ProcessInfo.processInfo.systemUptime < deadline,
               let agent = resolveAgent(),
@@ -125,8 +153,11 @@ public actor ModernItemEnumerator {
             guard let role = occupancyAttribute(window, kAXRoleAttribute, deadline: deadline) as? String else { return snapshot }
             guard role == "AXWindow" else { continue }
             guard let windowFrame = occupancyFrame(window, deadline: deadline),
-                  ModernMenuBarOccupancy.isUsable(windowFrame),
-                  let groups = occupancyAttribute(window, kAXChildrenAttribute, deadline: deadline) as? [AXUIElement],
+                  ModernMenuBarOccupancy.isUsable(windowFrame) else { return snapshot }
+            // A retracted or busy bar on another display must not prevent
+            // interaction with the readable bar under the pointer.
+            guard windowFrame.contains(point) else { continue }
+            guard let groups = occupancyAttribute(window, kAXChildrenAttribute, deadline: deadline) as? [AXUIElement],
                   !groups.isEmpty else { return snapshot }
             snapshot.windowFrames.append(windowFrame)
             for group in groups {
@@ -343,7 +374,7 @@ public actor ModernItemEnumerator {
                 guard CFGetTypeID(value) == AXUIElementGetTypeID() else { return nil }
                 // CF types require a forced bridge after checking the runtime type ID.
                 // swiftlint:disable:next force_cast
-                return value as! AXUIElement
+                return (value as! AXUIElement)
             }
         let extrasBar = explicit ?? menuBars.min { lhs, rhs in
             (frame(of: lhs)?.width ?? .greatestFiniteMagnitude)

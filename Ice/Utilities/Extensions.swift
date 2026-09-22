@@ -592,17 +592,18 @@ extension NSScreen {
     /// A best-effort AppKit-coordinate frame for the menu bar, including the
     /// reveal strip used when the system auto-hides the menu bar.
     var appKitMenuBarFrame: CGRect {
-        let height = getMenuBarHeight() ?? NSStatusBar.system.thickness
-        let lowerBound = if visibleFrame.maxY < frame.maxY {
-            visibleFrame.maxY
-        } else {
-            frame.maxY - height
-        }
-        return CGRect(
-            x: frame.minX,
-            y: lowerBound,
-            width: frame.width,
-            height: frame.maxY - lowerBound
+        let menuBarWindow = WindowInfo.menuBarWindow(for: displayID)
+        let options = NSApp.currentSystemPresentationOptions
+        let automaticallyHidden = Defaults.globalDomain["_HIHideMenuBar"] as? Bool == true ||
+            options.contains(.autoHideMenuBar) || options.contains(.hideMenuBar)
+        // Window geometry is display-specific. NSMenu is a fallback for the
+        // active screen when Screen Recording does not expose window names.
+        let isPresented = menuBarWindow != nil ||
+            (self == NSScreen.main && NSMenu.menuBarVisible())
+        return ModernMenuBarGeometry.interactionFrame(
+            screen: frame,
+            height: menuBarWindow?.bounds.height ?? max(safeAreaInsets.top, NSStatusBar.system.thickness),
+            isRetracted: automaticallyHidden && !isPresented
         )
     }
 

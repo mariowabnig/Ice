@@ -15,7 +15,7 @@ enum ModernVisibilityVerification: Equatable {
 enum ModernVisibilityVerifier {
     static func verify(_ plan: ModernVisibilityPlan, in snapshot: ModernMenuBarSnapshot) -> ModernVisibilityVerification {
         guard snapshot.canVerifyVisibility else { return .unreadable }
-        let stillVisible = snapshot.items.map(\.id).filter { plan.conceals($0) }
+        let stillVisible = snapshot.verificationItems.map(\.id).filter { plan.conceals($0) }
         return stillVisible.isEmpty ? .confirmedHidden : .stillVisible(stillVisible)
     }
 }

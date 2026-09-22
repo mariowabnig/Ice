@@ -4,6 +4,38 @@ import XCTest
 final class ModernMenuBarOccupancyTests: XCTestCase {
     private let bar = CGRect(x: 0, y: 0, width: 1440, height: 26)
 
+    func testRetractedBarDoesNotOwnApplicationToolbar() {
+        let screen = CGRect(x: 0, y: 0, width: 1440, height: 900)
+        let frame = ModernMenuBarGeometry.interactionFrame(screen: screen, height: 26, isRetracted: true)
+        XCTAssertTrue(frame.contains(CGPoint(x: 700, y: 899.5)))
+        XCTAssertFalse(frame.contains(CGPoint(x: 700, y: 885)))
+        XCTAssertEqual(frame.height, 1)
+    }
+
+    func testPresentedBarAndNotchedDisplayUseTheirActualHeight() {
+        let screen = CGRect(x: -1512, y: 200, width: 1512, height: 982)
+        let frame = ModernMenuBarGeometry.interactionFrame(screen: screen, height: 38, isRetracted: false)
+        XCTAssertEqual(frame, CGRect(x: -1512, y: 1144, width: 1512, height: 38))
+        XCTAssertTrue(frame.contains(CGPoint(x: -800, y: 1150)))
+        XCTAssertFalse(frame.contains(CGPoint(x: 800, y: 1150)))
+    }
+
+    func testRetractionAndPartialRevealAreNotVisibilityEvidence() {
+        let display = CGRect(x: 0, y: 0, width: 1440, height: 900)
+        XCTAssertTrue(ModernMenuBarGeometry.isPresented(bar, on: [display]))
+        XCTAssertFalse(ModernMenuBarGeometry.isPresented(bar.offsetBy(dx: 0, dy: -26), on: [display]))
+        XCTAssertFalse(ModernMenuBarGeometry.isPresented(bar.offsetBy(dx: 0, dy: -12), on: [display]))
+        XCTAssertFalse(ModernMenuBarGeometry.isPresented(CGRect(x: 0, y: 0, width: 1440, height: 1), on: [display]))
+        XCTAssertFalse(ModernMenuBarGeometry.isPresented(.null, on: [display]))
+    }
+
+    func testPresentedBarUsesDisplayOriginNotMainScreenOrigin() {
+        let display = CGRect(x: -1920, y: -200, width: 1920, height: 1080)
+        let secondaryBar = CGRect(x: -1920, y: -200, width: 1920, height: 26)
+        XCTAssertTrue(ModernMenuBarGeometry.isPresented(secondaryBar, on: [display]))
+        XCTAssertFalse(ModernMenuBarGeometry.isPresented(secondaryBar.offsetBy(dx: 0, dy: -26), on: [display]))
+    }
+
     private func approves(_ snapshot: ModernMenuBarOccupancy, _ point: CGPoint, elapsed: TimeInterval = 0.05) -> Bool {
         snapshot.confirmsEmptySpace(at: point, requestedAt: 10, now: 10 + elapsed)
     }

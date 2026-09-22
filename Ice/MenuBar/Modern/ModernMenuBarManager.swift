@@ -53,13 +53,13 @@ final class ModernMenuBarManager: ObservableObject {
             updateKnownItems(from: snapshot)
         }
         guard snapshot.canVerifyVisibility else {
-            visibilityStatus = awaitingVisibility
-                ? "Waiting for macOS to provide a complete menu bar snapshot..."
-                : visibilityStatus
             applyVisibility()
+            if awaitingVisibility, !snapshot.isMenuBarPresented {
+                visibilityStatus = "Menu bar hiding is active; verification resumes when the menu bar is shown."
+            }
             return
         }
-        lastObservedIDs = Set(snapshot.items.map(\.id))
+        lastObservedIDs = Set(snapshot.verificationItems.map(\.id))
         if awaitingVisibility {
             finishVisibilityVerification(snapshot, generation: visibilityLifecycle.generation, plan: appliedVisibility, allowFailure: false)
         } else if assertion != nil, appliedVisibility.requiresAssertion, !isEditing {
@@ -88,6 +88,7 @@ final class ModernMenuBarManager: ObservableObject {
         let visibilityGeneration = visibilityLifecycle.generation
         let requestedAt = ProcessInfo.processInfo.systemUptime
         let snapshot = await occupancyEnumerator.snapshotOccupancy(
+            at: point,
             deadline: requestedAt + ModernMenuBarOccupancy.maximumSnapshotDuration
         )
         guard !Task.isCancelled, visibilityLifecycle.generation == visibilityGeneration else { return false }
@@ -264,6 +265,12 @@ final class ModernMenuBarManager: ObservableObject {
         allowFailure: Bool = true
     ) {
         guard visibilityLifecycle.generation == generation, awaitingVisibility, appliedVisibility == plan else { return }
+        // Retraction is normal, not an assertion failure or an unreadable-AX
+        // retry. Keep the assertion and verify on a subsequent visible refresh.
+        guard snapshot.isMenuBarPresented else {
+            visibilityStatus = "Menu bar hiding is active; verification resumes when the menu bar is shown."
+            return
+        }
         let result = ModernVisibilityVerifier.verify(plan, in: snapshot)
         switch visibilityLifecycle.verify(generation: generation, result: result, allowFailure: allowFailure) {
         case .confirmed:

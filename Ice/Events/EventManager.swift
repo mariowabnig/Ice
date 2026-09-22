@@ -421,7 +421,7 @@ extension EventManager {
         let delay = appState.settings.advanced.showOnHoverDelay
 
         if #available(macOS 27, *), hiddenSection.isHidden {
-            scheduleModernEmptySpaceAction(appState: appState, screen: screen, delay: delay) {
+            scheduleModernEmptySpaceAction(appState: appState, screen: screen, delay: delay, waitsForMenuBar: true) {
                 guard appState.settings.general.showOnHover,
                       appState.menuBarManager.showOnHoverAllowed, hiddenSection.isHidden else { return }
                 hiddenSection.show()
@@ -512,8 +512,9 @@ extension EventManager {
               let point = MouseHelpers.locationCoreGraphics,
               var appMenuFrame = screen.getApplicationMenuFrame(),
               ModernMenuBarOccupancy.isUsable(appMenuFrame) else { return false }
-        appMenuFrame.size.width += appMenuFrame.origin.x - screen.frame.origin.x
-        appMenuFrame.origin.x = screen.frame.origin.x
+        let displayBounds = CGDisplayBounds(screen.displayID)
+        appMenuFrame.size.width += appMenuFrame.origin.x - displayBounds.minX
+        appMenuFrame.origin.x = displayBounds.minX
         return !appMenuFrame.contains(point)
     }
 
@@ -521,9 +522,14 @@ extension EventManager {
         appState: AppState,
         screen: NSScreen,
         delay: TimeInterval,
+        waitsForMenuBar: Bool = false,
         action: @escaping @MainActor () -> Void
     ) {
-        guard isModernEmptySpaceCandidate(appState: appState, screen: screen),
+        // Hover can begin on the reveal strip before macOS has slid the bar
+        // into place. Clicks still require a visible, readable bar immediately.
+        guard isMouseInsideMenuBar(appState: appState, screen: screen),
+              !isMouseInsideNotch(appState: appState, screen: screen),
+              waitsForMenuBar || isModernEmptySpaceCandidate(appState: appState, screen: screen),
               let point = MouseHelpers.locationCoreGraphics else { return }
         cancelModernEmptySpaceAction()
         let intent = ModernMenuBarInteractionIntent(point: point, generation: modernInteractionGeneration)
@@ -531,14 +537,25 @@ extension EventManager {
             if delay > 0 {
                 do { try await Task.sleep(for: .seconds(delay)) } catch { return }
             }
-            guard let self, !Task.isCancelled,
-                  intent.isCurrent(point: MouseHelpers.locationCoreGraphics, generation: modernInteractionGeneration),
-                  isModernEmptySpaceCandidate(appState: appState, screen: screen) else { return }
-            let isEmpty = await appState.modernMenuBarManager.confirmsEmptySpace(at: point)
-            guard isEmpty, !Task.isCancelled,
-                  intent.isCurrent(point: MouseHelpers.locationCoreGraphics, generation: modernInteractionGeneration),
-                  isModernEmptySpaceCandidate(appState: appState, screen: screen) else { return }
-            action()
+            guard let self else { return }
+            // Bounded retries allow a stationary pointer to survive the reveal
+            // animation. Each attempt uses new AX geometry and its own deadline.
+            let deadline = ProcessInfo.processInfo.systemUptime + (waitsForMenuBar ? 1.5 : 0)
+            repeat {
+                guard !Task.isCancelled,
+                      intent.isCurrent(point: MouseHelpers.locationCoreGraphics, generation: modernInteractionGeneration),
+                      isMouseInsideMenuBar(appState: appState, screen: screen) else { return }
+                if isModernEmptySpaceCandidate(appState: appState, screen: screen),
+                   await appState.modernMenuBarManager.confirmsEmptySpace(at: point) {
+                    guard !Task.isCancelled,
+                          intent.isCurrent(point: MouseHelpers.locationCoreGraphics, generation: modernInteractionGeneration),
+                          isModernEmptySpaceCandidate(appState: appState, screen: screen) else { return }
+                    action()
+                    return
+                }
+                guard waitsForMenuBar, ProcessInfo.processInfo.systemUptime < deadline else { return }
+                do { try await Task.sleep(for: .milliseconds(100)) } catch { return }
+            } while ProcessInfo.processInfo.systemUptime < deadline
         }
     }
 
@@ -563,6 +580,8 @@ extension EventManager {
            screen.containsAppKitMenuBarPoint(mouseLocation) {
             return true
         }
+        // Cached editor frames can still describe a bar that has retracted.
+        if #available(macOS 27, *) { return false }
         return isMouseInsideMenuBarItem(appState: appState, screen: screen)
     }
 

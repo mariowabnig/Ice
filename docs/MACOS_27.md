@@ -19,6 +19,8 @@ On macOS 27.0 (26A428), Ice logged `Missing control item for hidden section` and
 
 ## Current limits
 
+Automatic menu bar hiding remains enabled during normal use and section assignment. Pointer checks use the live menu bar height, or only the one-pixel reveal edge while retracted, including fullscreen presentation. Stationary hover retries fresh geometry for up to 1.5 seconds after the configured delay, so slide-down does not require another pointer movement. Clicks are not retried. Occupancy is read on the display containing the pointer; stale editor frames cannot extend the interactive region into application toolbars. Concealment assertions are retained while all menu bars are retracted, and verification resumes from presented display observations on the next refresh. Physical reordering still requires visible endpoints.
+
 - Tiles show application icons, not live captures of each status-item glyph.
 - Move endpoints must be visible in the same menu bar. Expand macOS's overflow area before moving an off-screen item. Additional displays have not been manually verified.
 - Wi-Fi, Battery, Sound, Bluetooth, Display, Input Menu, Clock and Screen Mirroring use individual system allowlist entries. SystemUIServer extras hide together by bundle. Control Center itself and helper overlays without a bundle identity cannot be hidden.
@@ -133,3 +135,25 @@ revealed then concealed BetterTouchTool and Wi-Fi. The beta still reports
 active-but-unverified hiding after an incomplete discovery snapshot; the native
 UI driver also cannot synthesize physical clicks on macOS 27's composited menu
 bar. Physical tracker-click and additional-display validation remain incomplete.
+
+## Automatic menu bar hiding follow-up — 2026-09-22
+
+Build `0.11.13-dev.2-macos27.3` (`2026092203`) includes the retraction geometry,
+stationary-hover retry and presented-display verification changes described
+above. Debug build-for-testing, all 50 native XCTest cases, all 17 standalone
+checks and the universal Release build pass. The unsigned XCTest host stalled
+in dyld before tests began; signing the built Debug bundle with the existing
+Ice Local Development identity allowed test-without-building to pass.
+
+Installed `/Applications/Ice.app` passes strict recursive signature verification.
+The stale Accessibility approval was removed using `tccutil reset Accessibility
+com.jordanbaird.Ice`, and the exact installed app was re-added through System
+Settings. The settings toggle was verified on; restarting Ice opened General
+and reported active hiding. The nine saved assignments and automatic menu-bar
+hiding preference are intact. Live physical hover/retract, fullscreen and
+second-display interactions remain unverified by the native UI driver.
+
+The follow-up adversarial review distinguishes positively observed retraction
+from missing/invalid AX frames and failed display enumeration. Unknown geometry
+uses the normal bounded unreadable-snapshot retries; it cannot silently pause
+verification forever as though the user had hidden the menu bar.

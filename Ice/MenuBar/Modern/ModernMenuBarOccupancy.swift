@@ -6,6 +6,23 @@
 import CoreGraphics
 import Foundation
 
+/// Pure geometry shared by pointer handling and visibility verification.
+enum ModernMenuBarGeometry {
+    static func isPresented(_ menuBar: CGRect, on displays: [CGRect]) -> Bool {
+        guard ModernMenuBarOccupancy.isUsable(menuBar), menuBar.height > 1 else { return false }
+        return displays.contains { display in
+            display.contains(menuBar) && abs(menuBar.minY - display.minY) <= 1
+        }
+    }
+
+    /// AppKit coordinates. A retracted bar owns only its reveal edge, not the
+    /// title bar or toolbar of the application underneath it.
+    static func interactionFrame(screen: CGRect, height: CGFloat, isRetracted: Bool) -> CGRect {
+        let visibleHeight = isRetracted ? 1 : max(1, min(height, screen.height))
+        return CGRect(x: screen.minX, y: screen.maxY - visibleHeight, width: screen.width, height: visibleHeight)
+    }
+}
+
 /// Interaction geometry is deliberately independent of editor identities. One app
 /// can own several status items, and each item can occur on several displays.
 struct ModernMenuBarOccupancy: Sendable {

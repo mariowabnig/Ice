@@ -102,7 +102,7 @@ The separate Ice Bar uses the system menu bar on macOS 27. Some optional Control
 
 Ice can show and rehide hidden items when macOS is configured to automatically hide and show the menu bar. Some menu bar apps also draw their own status-level windows instead of relying only on macOS's native status item list. Ice treats visible auxiliary status-level windows as menu bar items when possible and reserves room from their hidden-state position while hidden items are shown. Bundle-identified auxiliary overlays are treated as read-only items owned by their app. Unknown non-contract auxiliary windows can still be visually covered while the system menu bar is retracted and redrawn centered when they are top-pinned. Cover images are cached and refreshed only when they need to change.
 
-Menu bar layout editing still requires a permanently visible menu bar. If the Menu Bar Layout pane says Ice cannot arrange items in automatically hidden menu bars, temporarily set `Automatically hide and show the menu bar` to `Never`, arrange the items, then restore your preferred setting.
+On macOS 27, section assignments work with automatic menu bar hiding enabled. Hover reveal waits briefly for the system menu bar to slide into view; clicks and scrolls only act in the live menu bar or its top-edge reveal strip. Physical reordering still requires both items to be visible in the same menu bar. On macOS 14–26, if the layout pane says it cannot arrange items in automatically hidden menu bars, temporarily select `Never`, arrange the items, then restore your preferred setting.
 
 ## Gallery
 

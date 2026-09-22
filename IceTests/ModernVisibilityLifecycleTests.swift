@@ -36,6 +36,31 @@ final class ModernVisibilityLifecycleTests: XCTestCase {
         XCTAssertEqual(ModernVisibilityVerifier.verify(plan, in: snapshot), .unreadable)
     }
 
+    func testRetractedBarCannotConfirmOrFailHidingFromCachedItems() {
+        var plan = ModernVisibilityPlan()
+        plan.bundles = ["example.hidden"]
+        for observed in [[systemAnchor()], [item("example.hidden"), systemAnchor()]] {
+            let snapshot = ModernMenuBarSnapshot(items: observed, isReadable: true, isMenuBarPresented: false)
+            XCTAssertEqual(ModernVisibilityVerifier.verify(plan, in: snapshot), .unreadable)
+            XCTAssertFalse(snapshot.canVerifyVisibility)
+        }
+    }
+
+    func testRetractedDisplayDoesNotInvalidateHidingOnPresentedDisplay() {
+        var plan = ModernVisibilityPlan()
+        plan.bundles = ["example.hidden"]
+        let snapshot = ModernMenuBarSnapshot(
+            items: [item("example.hidden"), systemAnchor()],
+            isReadable: true,
+            presentedItems: [systemAnchor()]
+        )
+        XCTAssertEqual(ModernVisibilityVerifier.verify(plan, in: snapshot), .confirmedHidden)
+        let missingVisibleAnchor = ModernMenuBarSnapshot(
+            items: [systemAnchor()], isReadable: true, presentedItems: []
+        )
+        XCTAssertFalse(missingVisibleAnchor.canVerifyVisibility)
+    }
+
     func testStillVisibleTargetFailsVerification() {
         var plan = ModernVisibilityPlan()
         plan.bundles = ["example.hidden"]
