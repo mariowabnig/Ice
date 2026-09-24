@@ -19,6 +19,8 @@ On macOS 27.0 (26A428), Ice logged `Missing control item for hidden section` and
 
 ## Current limits
 
+Input Menu requires excluding both the keyboard system identifier and its separate `com.apple.TextInputMenuAgent` host from the assertion allowlists. On 27.0 (26A428), allowing the host overrides the system-only hiding request. The September 24 repair keeps both lists consistent and restores the host when Input Menu is revealed. Before this repair, verification repeatedly found that single 35-point item, released the assertion, and brought every hidden item back. Accessibility reapproval alone did not resolve it.
+
 Automatic menu bar hiding remains enabled during normal use and section assignment. Pointer checks use the live menu bar height, or only the one-pixel reveal edge while retracted, including fullscreen presentation. Stationary hover retries fresh geometry for up to 1.5 seconds after the configured delay, so slide-down does not require another pointer movement. Clicks are not retried. Occupancy is read on the display containing the pointer; stale editor frames cannot extend the interactive region into application toolbars. Concealment assertions are retained while all menu bars are retracted, and verification resumes from presented display observations on the next refresh. Physical reordering still requires visible endpoints.
 
 - Tiles show application icons, not live captures of each status-item glyph.
@@ -161,3 +163,11 @@ verification forever as though the user had hidden the menu bar.
 ### Layout editor identity and icons
 
 Itsycal uses a stable single-item identity so daily date changes do not accumulate stale tiles or break drag lookup. System controls use named, colored symbols; app icons fall back to the installed bundle. Each tile exposes a Move to menu for section assignment, and unsupported items are labeled Managed by macOS.
+
+### Input Menu allowlist repair — 2026-09-24
+
+The installed universal app initially matched both Mach-O UUIDs of the successful GitHub artifact for `mariowabnig/Ice` commit `b688916` (run `36010740216`). Removed the existing Accessibility registration and re-added `/Applications/Ice.app`; the fresh launch passed all permission checks, but hiding still failed. Added `ModernVisibility` unified logging, which isolated `com.apple.TextInputMenuAgent::Item-0` as the remaining visible item at `(1474.5, 0, 35, 30)` after all other requested items were hidden.
+
+Excluding that host when keyboard is concealed resolved the live failure. Release build and all 19 standalone visibility/layout/geometry checks passed, including host exclusion and restoration. The installed local repair is signed with the existing Ice Local Development identity and passes strict recursive signature verification. Three reveal/hide cycles (including closing the layout editor), sustained hiding, and a clean restart confirmed concealed items absent from the MenuBarAgent tree and `confirmedHidden` in runtime logs. All 15 saved assignments were preserved. The follow-up review passed all 52 native XCTest cases, including Hidden/Always Hidden reveal-state coverage, and strict SwiftLint 0.65.1. Diagnostic identifiers and verification results use private logging; the captured machine log stays local. The pre-repair GitHub build remains at `/Applications/Ice-backups.noindex/Ice-20260924-210248.app`.
+
+For the Portworth check, temporarily changed macOS menu bar auto-hide from Always to Never. Portworth restored native rendering; its green dot returned to the same settled position after an additional Ice reveal/conceal cycle. Restored Always and verified the setting in System Settings. Direct pointer-driven auto-hide interaction remains unverified because the native UI driver cannot target the composited MenuBarAgent window. No Portworth code or preferences were changed.

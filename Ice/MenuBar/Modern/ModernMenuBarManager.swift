@@ -5,10 +5,12 @@
 
 import Cocoa
 import Combine
+import OSLog
 
 /// The macOS 27 status-item backend. AppState owns it alongside the legacy managers.
 @MainActor
 final class ModernMenuBarManager: ObservableObject {
+    private let diagnosticLogger = Logger(subsystem: "com.jordanbaird.Ice", category: "ModernVisibility")
     @Published private(set) var items: [ModernMenuBarItem] = []
     @Published private(set) var layout: ModernMenuBarLayout
     @Published private(set) var isRefreshing = false
@@ -183,7 +185,7 @@ final class ModernMenuBarManager: ObservableObject {
             runningBundles: runningBundles,
             ownBundle: Constants.bundleIdentifier
         )
-        let allowed = runningBundles.subtracting(effective.bundles).union([Constants.bundleIdentifier])
+        let allowed = effective.allowedBundles(runningBundles: runningBundles, ownBundle: Constants.bundleIdentifier)
         if let failure = visibilityFailure, failure.plan == effective, !forceRetry {
             visibilityStatus = failure.canRetryAutomatically
                 ? "Menu bar hiding is waiting to retry."
@@ -272,6 +274,10 @@ final class ModernMenuBarManager: ObservableObject {
             return
         }
         let result = ModernVisibilityVerifier.verify(plan, in: snapshot)
+        diagnosticLogger.info("Verification generation=\(generation) result=\(String(describing: result), privacy: .private)")
+        for item in snapshot.verificationItems where plan.conceals(item.id) {
+            diagnosticLogger.info("Remaining item \(item.id.bundleID, privacy: .private) frame=\(String(describing: item.frame), privacy: .public)")
+        }
         switch visibilityLifecycle.verify(generation: generation, result: result, allowFailure: allowFailure) {
         case .confirmed:
             NSLog("[Ice ModernMenuBar] verified hiding generation=%ld", generation)
@@ -302,6 +308,9 @@ final class ModernMenuBarManager: ObservableObject {
 
     private func checkActiveVisibility(_ snapshot: ModernMenuBarSnapshot, plan: ModernVisibilityPlan) {
         let result = ModernVisibilityVerifier.verify(plan, in: snapshot)
+        if case .stillVisible = result {
+            diagnosticLogger.warning("Active hiding changed: \(String(describing: result), privacy: .private)")
+        }
         switch visibilityLifecycle.observeActive(result) {
         case .confirmed:
             errorMessage = nil
