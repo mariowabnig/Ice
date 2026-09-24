@@ -87,13 +87,25 @@ struct ModernMenuBarLayoutPane: View {
 
     private func tile(_ item: ModernMenuBarItem) -> some View {
         VStack(spacing: 5) {
-            if let icon = NSRunningApplication(processIdentifier: item.pid)?.icon {
+            if let symbol = item.id.displaySymbol {
+                Image(systemName: symbol).font(.title2).foregroundStyle(.blue).frame(height: 26)
+            } else if let icon = appIcon(for: item) {
                 Image(nsImage: icon).resizable().scaledToFit().frame(width: 26, height: 26)
             } else {
                 Image(systemName: "menubar.rectangle").font(.title2).frame(height: 26)
             }
             Text(item.id.systemDisplayName ?? item.appName ?? item.id.title)
                 .font(.caption).lineLimit(2).multilineTextAlignment(.center)
+            Menu("Move to…") {
+                ForEach(ModernMenuBarLayout.Section.allCases, id: \.self) { section in
+                    Button(section.title) { manager.assign(item, to: section) }
+                        .disabled(section != .visible && !manager.canAssign(item))
+                }
+            }
+            .font(.caption2)
+            if !manager.canAssign(item) {
+                Text("Managed by macOS").font(.caption2).foregroundStyle(.secondary)
+            }
             if item.id.isUserSwitcher {
                 Text("Hides with system extras").font(.caption2).foregroundStyle(.secondary)
             }
@@ -108,6 +120,12 @@ struct ModernMenuBarLayoutPane: View {
                     .disabled(section != .visible && !manager.canAssign(item))
             }
         }
+    }
+
+    private func appIcon(for item: ModernMenuBarItem) -> NSImage? {
+        if let icon = NSRunningApplication(processIdentifier: item.pid)?.icon { return icon }
+        guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: item.id.bundleID) else { return nil }
+        return NSWorkspace.shared.icon(forFile: url.path)
     }
 
     private func matchesSearch(_ item: ModernMenuBarItem) -> Bool {

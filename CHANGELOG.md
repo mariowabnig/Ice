@@ -5,6 +5,8 @@ All notable changes to Ice are tracked here retroactively from the available git
 ## Unreleased
 
 ### macOS 27 compatibility
+- Keep Itsycal’s identity stable across daily date changes to prevent duplicate layout entries and stale drag targets.
+- Add recognizable system symbols, installed-app icon fallbacks, and a Move to menu on each layout tile; label controls whose hiding is managed by macOS.
 - Support automatic menu bar retraction without treating application toolbars or cached off-screen icons as menu-bar space. Retry stationary hover during slide-down, query occupancy on the pointed-at display, and defer hiding verification until a bar is presented. Keep failed geometry reads on the bounded unreadable-snapshot path rather than mistaking them for normal retraction.
 - Prevent clicks on multi-icon apps such as Claude Usage from toggling Hidden items: confirm empty space using fresh raw Accessibility geometry, reject incomplete/stale reads, and cancel delayed actions after newer input or visibility changes.
 - Integrate the official 0.11.13-dev.2 beta while preserving custom macOS 27, Portworth and auxiliary-item behavior; protect this build from automatic upstream replacement.

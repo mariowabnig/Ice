@@ -157,3 +157,7 @@ The follow-up adversarial review distinguishes positively observed retraction
 from missing/invalid AX frames and failed display enumeration. Unknown geometry
 uses the normal bounded unreadable-snapshot retries; it cannot silently pause
 verification forever as though the user had hidden the menu bar.
+
+### Layout editor identity and icons
+
+Itsycal uses a stable single-item identity so daily date changes do not accumulate stale tiles or break drag lookup. System controls use named, colored symbols; app icons fall back to the installed bundle. Each tile exposes a Move to menu for section assignment, and unsupported items are labeled Managed by macOS.

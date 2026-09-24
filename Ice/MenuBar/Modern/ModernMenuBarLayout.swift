@@ -11,7 +11,9 @@ public struct ModernItemID: Hashable, Codable, Sendable {
     let title: String
 
     static func status(bundle: String, title: String) -> Self {
-        Self(bundleID: bundle, title: title)
+        // Itsycal has one status item whose accessibility title changes daily.
+        // Keep its identity stable for cached discovery and drag resolution.
+        Self(bundleID: bundle, title: bundle == "com.mowglii.ItsycalApp" ? "Itsycal" : title)
     }
 
     var rawValue: String { "\(bundleID)::\(title)" }

@@ -50,8 +50,30 @@ extension ModernItemID {
         bundle == "com.apple.systemuiserver" || !bundle.hasPrefix("com.apple.")
     }
 
+    var displaySymbol: String? {
+        if title == "Spotlight" { return "magnifyingglass" }
+        if isUserSwitcher { return "person.crop.circle" }
+        if title == "com.apple.menuextra.controlcenter" { return "switch.2" }
+        if title == "com.apple.menuextra.focusmode" { return "moon.fill" }
+        if title == "com.apple.menuextra.now-playing" { return "play.circle.fill" }
+        switch systemItem {
+        case .battery: return "battery.100percent"
+        case .bluetooth: return "antenna.radiowaves.left.and.right"
+        case .clock: return "clock.fill"
+        case .displays: return "display"
+        case .keyboard: return "keyboard"
+        case .volume: return "speaker.wave.2.fill"
+        case .wifi: return "wifi"
+        case .screenMirroring: return "rectangle.on.rectangle"
+        default: return nil
+        }
+    }
+
     var systemDisplayName: String? {
         if isUserSwitcher { return "User" }
+        if title == "Spotlight" { return "Spotlight" }
+        if title == "com.apple.menuextra.focusmode" { return "Focus" }
+        if title == "com.apple.menuextra.now-playing" { return "Now Playing" }
         if title == "com.apple.menuextra.controlcenter" { return "Control Center" }
         switch systemItem {
         case .battery: return "Battery"

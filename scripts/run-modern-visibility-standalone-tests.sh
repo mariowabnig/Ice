@@ -75,6 +75,15 @@ func system(_ name: String) -> ModernItemID {
     .status(bundle: "com.apple.MenuBarAgent", title: "com.apple.menuextra.\(name)")
 }
 
+test("Itsycal dates retain one identity while other apps keep distinct items") {
+    let old = item("com.mowglii.ItsycalApp", title: "Itsycal, 23")
+    let current = item("com.mowglii.ItsycalApp", title: "Itsycal, 24")
+    let merged = ModernItemDiscovery.mergedItems(previous: [old], observed: [current], appliedVisibility: ModernVisibilityPlan(), retainAllUnobserved: true, ownBundle: "ice", isAlive: { _ in true })
+    checkEqual(merged.count, 1, "date changes replace the old tile")
+    checkEqual(old.id, current.id, "fresh drag lookup resolves the same item")
+    check(item("example.multi", title: "A").id != item("example.multi", title: "B").id, "other apps retain distinct items")
+}
+
 test("auto-hidden menu bars own only the reveal edge while retracted") {
     let screen = CGRect(x: -1512, y: 200, width: 1512, height: 982)
     let hidden = ModernMenuBarGeometry.interactionFrame(screen: screen, height: 38, isRetracted: true)
