@@ -5,6 +5,9 @@ All notable changes to Ice are tracked here retroactively from the available git
 ## Unreleased
 
 ### macOS 27 compatibility
+- Bound Accessibility snapshots and child reads, reject stale visibility replies, and preserve discovered items after incomplete move verification.
+- Refresh from MenuBarAgent notifications with a 20-second backstop, suspend during screen sleep/inactive sessions, and cancel verification on stop. Coalesce wake refreshes and avoid unrelated application assertion resets.
+- Remove legacy pointer/cover polling on macOS 27, cache the auto-hide preference, allow small click jitter, and keep one cancellable hover delay. Explain that hiding app menus is unavailable on macOS 27.
 - Keep Itsycal’s identity stable across daily date changes to prevent duplicate layout entries and stale drag targets.
 - Add recognizable system symbols, installed-app icon fallbacks, and a Move to menu on each layout tile; label controls whose hiding is managed by macOS.
 - Support automatic menu bar retraction without treating application toolbars or cached off-screen icons as menu-bar space. Retry stationary hover during slide-down, query occupancy on the pointed-at display, and defer hiding verification until a bar is presented. Keep failed geometry reads on the bounded unreadable-snapshot path rather than mistaking them for normal retraction.
