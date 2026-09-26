@@ -33,6 +33,10 @@ final class ModernMenuBarManager: ObservableObject {
     private var awaitingVisibility = false
     private var visibilityLifecycle = ModernVisibilityLifecycle()
     private var lastObservedIDs = Set<ModernItemID>()
+    private lazy var watchdog = ModernMenuBarWatchdog { [weak self] in
+        guard let self else { return false }
+        return !self.isEditing && !self.isMoving
+    }
 
     init() {
         layout = Defaults.data(forKey: .modernMenuBarLayout)
@@ -41,6 +45,7 @@ final class ModernMenuBarManager: ObservableObject {
 
     func performSetup() {
         guard timer == nil else { return }
+        watchdog.start()
         timer = Timer.publish(every: 3, on: .main, in: .common).autoconnect()
             .sink { [weak self] _ in Task { await self?.refresh() } }
         Task { await refresh() }
@@ -385,6 +390,7 @@ final class ModernMenuBarManager: ObservableObject {
     }
 
     func stop() {
+        watchdog.stop()
         timer?.cancel()
         timer = nil
         visibilityRetryTask?.cancel()

@@ -5,6 +5,7 @@ All notable changes to Ice are tracked here retroactively from the available git
 ## Unreleased
 
 ### macOS 27 compatibility
+- Recover automatically from sustained MenuBarAgent hangs, using repeated Accessibility timeouts plus resource pressure, active-session guards, exact process identity checks, and a persisted 30-minute restart cooldown. Preserve saved layout assignments and keep local recovery diagnostics.
 - Remove the Input Menu host from the app allowlist when Input Menu is hidden. Previously its system assignment conflicted with the host exemption, causing verification failures, all hidden icons to return, and repeated menu bar reflow.
 - Keep Itsycal’s identity stable across daily date changes to prevent duplicate layout entries and stale drag targets.
 - Add recognizable system symbols, installed-app icon fallbacks, and a Move to menu on each layout tile; label controls whose hiding is managed by macOS.

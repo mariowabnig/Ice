@@ -1,5 +1,41 @@
 # macOS 27 compatibility
 
+## MenuBarAgent hang recovery — 2026-09-26
+
+Build `0.11.13-dev.2-macos27.4` adds automatic recovery for the observed
+MenuBarAgent hang (unresponsive AX root, approximately 129% CPU and 5.2 GB
+footprint). Restarting that service restored the existing Ice layout; the
+initial trigger is unknown. This mitigates recurrence, not the underlying
+macOS defect.
+
+While the session is unlocked and active, a separate bounded AX probe runs
+every 10 seconds. Recovery requires repeated root transport timeouts and at
+least 30 seconds of sustained CPU use of 80% of one core or resident memory
+of 1 GiB. Responsive high-resource processes, ordinary visibility verification
+failures, and normal retracted menu bars do not trigger recovery. Lock/sleep,
+missing Accessibility permission, layout editing, process replacement and
+long observation gaps discard accumulated evidence. A 30-second grace period
+follows startup and wake/unlock.
+
+Only the current user's process at Apple's exact MenuBarAgent executable path
+can receive SIGTERM, with PID and kernel start time rechecked after the asynchronous
+probe. launchd replaces it; Ice's existing refresh restores/verifies hiding.
+An attempted restart records `ModernMenuBarLastRecovery` before signalling,
+limiting recovery to once per 30 minutes even across Ice relaunches. No force
+kill or repeated escalation is used. Local `MenuBarRecovery` logs record
+watchdog startup and recovery attempts. Saved layout assignments are unchanged.
+
+Validation: 63 native XCTest cases, 19 standalone visibility/layout/geometry
+checks, strict SwiftLint 0.65.1 across all 117 app files, and the universal
+Release build passed. The local test host needed re-signing without hardened
+runtime to load its test dylib, matching the existing local development setup.
+The installed app uses the existing signing identity and passes strict recursive
+signature verification. Startup logs confirm the watchdog is enabled, General
+reports active hiding, and the saved layout hash is unchanged. The previous app
+is retained at `/Applications/Ice-backups.noindex/Ice-20260926-before-watchdog.app`.
+No artificial system hang or physical lock/unlock cycle was induced for testing;
+the automatic trigger is covered by policy tests and normal live monitoring.
+
 ## Why the old layout pane was empty
 
 On macOS 27.0 (26A428), Ice logged `Missing control item for hidden section` and cleared its entire item cache. MenuBarAgent now composites status items: the old `CGSGetProcessMenuBarWindowList` path does not supply the individual item windows Ice needs. The running app had Accessibility and Screen Recording permission, so resetting those permissions would not repair this discovery path.

@@ -151,6 +151,7 @@ extension Defaults {
         case rehideInterval = "RehideInterval"
         case itemSpacingOffset = "ItemSpacingOffset"
         case modernMenuBarLayout = "ModernMenuBarLayout"
+        case modernMenuBarLastRecovery = "ModernMenuBarLastRecovery"
 
         // MARK: Hotkeys Settings
         case hotkeys = "Hotkeys"
