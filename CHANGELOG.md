@@ -5,6 +5,7 @@ All notable changes to Ice are tracked here retroactively from the available git
 ## Unreleased
 
 ### macOS 27 compatibility
+- Distinguish denied Accessibility access from unreadable menu bar snapshots. Show repair guidance for an already-enabled but ineffective Accessibility entry, open the relevant Settings pane, and recheck access/setup before refreshing.
 - Bound Accessibility snapshots and child reads, reject stale visibility replies, and preserve discovered items after incomplete move verification.
 - Refresh from MenuBarAgent notifications with a 20-second backstop, suspend during screen sleep/inactive sessions, and cancel verification on stop. Coalesce wake refreshes and avoid unrelated application assertion resets.
 - Remove legacy pointer/cover polling on macOS 27, cache the auto-hide preference, allow small click jitter, and keep one cancellable hover delay. Explain that hiding app menus is unavailable on macOS 27.

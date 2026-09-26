@@ -25,7 +25,7 @@ xcodebuild -project Ice.xcodeproj -scheme Ice -destination 'platform=macOS' \
   -derivedDataPath /tmp/ice-review-derived CODE_SIGNING_ALLOWED=NO test
 ```
 
-Result: **52 tests passed** (`/tmp/ice-review-final-tests.log`). Xcode printed CoreDevice/CoreSimulator version warnings, but the macOS build and test action succeeded. The build phase reported that SwiftLint is unavailable; strict lint has not been verified. `git diff --check` passed.
+Result: **53 tests passed** (`/tmp/ice-review-final-tests.log`). Xcode printed CoreDevice/CoreSimulator version warnings, but the macOS build and test action succeeded. The build phase reported that SwiftLint is unavailable; strict lint has not been verified. `git diff --check` passed.
 
 Added lifecycle regression tests were run before their fixes and both failed (`/tmp/ice-review-lifecycle-repro.log`):
 
@@ -69,3 +69,20 @@ Local code commits:
 - `dd7447a` — C2/C9: gate legacy menu bar work on macOS 27.
 - `6196cc1` — C3/C4/C6/C7/C9: synchronize modern refresh lifecycle.
 - `f61c7f4` — C5/C8: preserve click intents and coalesce hover delays.
+
+## Follow-up: Accessibility entry recovery
+
+The user reported an empty Menu Bar Layout after installation. The Accessibility switch in System Settings was on, but Ice's actual access check still failed. With the user's approval, the coordinating agent removed and re-added the current `/Applications/Ice.app` Accessibility entry; the layout populated again. This verifies the observed empty layout was recoverable through permission repair, rather than proving an AX timeout failure. Permission entry changes require user authorization; Ice does not automate them.
+
+The follow-up code now:
+
+- Rechecks the running process using the existing AX trust check, including when returning to the layout and when retrying after periodic permission checks have stopped.
+- Distinguishes denied process access, a refresh in progress, and a permitted-but-empty snapshot with a pure diagnostic selector.
+- Shows conditional remove/re-add guidance and the running app's actual bundle path, without claiming Ice can identify whether permission is missing or an older entry is involved.
+- Offers Open Accessibility Settings and Retry Access in the permission window, plus Retry Access and Refresh in the layout. Retry awaits the existing one-time app setup before requesting another snapshot.
+- Makes Continue recheck actual permissions instead of trusting a cached state.
+
+Six focused tests cover diagnostic precedence, allowed-but-empty snapshots, current path guidance, and explicit grant/revocation checks after periodic checks stop. The full suite passed: **59 tests, zero failures/skips**, confirmed with `xcresulttool get test-results summary` (`/tmp/ice-permission-diagnostics-tests.log`). The earlier 52-test report undercounted an interleaved output line; that preceding run had 53 passing tests. The Release build also succeeded (`/tmp/ice-permission-diagnostics-release.log`); install source: `/tmp/ice-review-derived/Build/Products/Release/Ice.app`. The coordinating agent will install and verify the UI with reauthorization arranged; this worker has not installed or restarted the app.
+
+
+Final follow-up UI verification: installed the tested Release via `build-and-install.sh` with strict signature verification. The installed Permissions window displayed the new actual-access denial guidance and current application path; Open Accessibility Settings reached the correct pane. After the user-authorized remove/re-add, the window reported Permission Granted and Continue in Limited Mode completed setup. Menu Bar Layout visibly populated all three saved sections, and Retry Access and Refresh retained the items. Screen Recording was not reauthorized; it remains optional and the app is in limited mode. This check verifies permission recovery and layout discovery, not hiding/CPU acceptance. Backup: `/Applications/Ice-backups.noindex/Ice-20260926-163232.app`. The local build remains ad-hoc signed, so future rebuilds can require reauthorization; the new UI explains that recovery instead of silently leaving empty sections. No TCC database edits or automatic permission resets were added.
