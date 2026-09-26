@@ -86,3 +86,11 @@ Six focused tests cover diagnostic precedence, allowed-but-empty snapshots, curr
 
 
 Final follow-up UI verification: installed the tested Release via `build-and-install.sh` with strict signature verification. The installed Permissions window displayed the new actual-access denial guidance and current application path; Open Accessibility Settings reached the correct pane. After the user-authorized remove/re-add, the window reported Permission Granted and Continue in Limited Mode completed setup. Menu Bar Layout visibly populated all three saved sections, and Retry Access and Refresh retained the items. Screen Recording was not reauthorized; it remains optional and the app is in limited mode. This check verifies permission recovery and layout discovery, not hiding/CPU acceptance. Backup: `/Applications/Ice-backups.noindex/Ice-20260926-163232.app`. The local build remains ad-hoc signed, so future rebuilds can require reauthorization; the new UI explains that recovery instead of silently leaving empty sections. No TCC database edits or automatic permission resets were added.
+
+## Remote integration and shipping
+
+On 2026-09-26 the user approved merging the two remote commits and pushing the result. The merge retains the Input Menu host allowlist correction and MenuBarAgent watchdog alongside the local bounded AX reads, notification-driven refresh, suspension lifecycle, and permission repair UI. Conflict resolution preserves the three-second visibility verification grace period and both sets of changelog entries. Watchdog recovery also respects the manager's suspended state.
+
+The 19 standalone visibility/layout/geometry checks passed. The first Xcode attempt hit an invalid cached Sparkle module; validation was rerun in a fresh derived-data directory. This integration does not install or restart the running app; the installed permission-recovery build remains the one verified above.
+
+Fresh-directory native validation passed: **72 tests, zero failures or skips**, confirmed by `xcresulttool get test-results summary`. Log: `/tmp/ice-merge-fresh-tests.log`; result bundle under `/tmp/ice-merge-validation-20260926/Logs/Test/`. Both working and staged diffs passed whitespace checks.

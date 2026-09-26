@@ -75,6 +75,15 @@ func system(_ name: String) -> ModernItemID {
     .status(bundle: "com.apple.MenuBarAgent", title: "com.apple.menuextra.\(name)")
 }
 
+test("hidden input menu cannot be allowed through its host bundle") {
+    let running: Set<String> = ["com.apple.TextInputMenuAgent", "example.visible", "example.hidden", "ice"]
+    var plan = ModernVisibilityPlan(bundles: ["example.hidden"], systemItems: [.keyboard])
+    checkEqual(plan.allowedBundles(runningBundles: running, ownBundle: "ice"), ["example.visible", "ice"], "both hide paths agree")
+    check(!plan.allowedSystemItems.contains(.keyboard), "system input menu is hidden")
+    plan.systemItems = []
+    check(plan.allowedBundles(runningBundles: running, ownBundle: "ice").contains("com.apple.TextInputMenuAgent"), "revealing restores host")
+}
+
 test("Itsycal dates retain one identity while other apps keep distinct items") {
     let old = item("com.mowglii.ItsycalApp", title: "Itsycal, 23")
     let current = item("com.mowglii.ItsycalApp", title: "Itsycal, 24")

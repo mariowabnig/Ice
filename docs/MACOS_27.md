@@ -1,5 +1,41 @@
 # macOS 27 compatibility
 
+## MenuBarAgent hang recovery — 2026-09-26
+
+Build `0.11.13-dev.2-macos27.4` adds automatic recovery for the observed
+MenuBarAgent hang (unresponsive AX root, approximately 129% CPU and 5.2 GB
+footprint). Restarting that service restored the existing Ice layout; the
+initial trigger is unknown. This mitigates recurrence, not the underlying
+macOS defect.
+
+While the session is unlocked and active, a separate bounded AX probe runs
+every 10 seconds. Recovery requires repeated root transport timeouts and at
+least 30 seconds of sustained CPU use of 80% of one core or resident memory
+of 1 GiB. Responsive high-resource processes, ordinary visibility verification
+failures, and normal retracted menu bars do not trigger recovery. Lock/sleep,
+missing Accessibility permission, layout editing, process replacement and
+long observation gaps discard accumulated evidence. A 30-second grace period
+follows startup and wake/unlock.
+
+Only the current user's process at Apple's exact MenuBarAgent executable path
+can receive SIGTERM, with PID and kernel start time rechecked after the asynchronous
+probe. launchd replaces it; Ice's existing refresh restores/verifies hiding.
+An attempted restart records `ModernMenuBarLastRecovery` before signalling,
+limiting recovery to once per 30 minutes even across Ice relaunches. No force
+kill or repeated escalation is used. Local `MenuBarRecovery` logs record
+watchdog startup and recovery attempts. Saved layout assignments are unchanged.
+
+Validation: 63 native XCTest cases, 19 standalone visibility/layout/geometry
+checks, strict SwiftLint 0.65.1 across all 117 app files, and the universal
+Release build passed. The local test host needed re-signing without hardened
+runtime to load its test dylib, matching the existing local development setup.
+The installed app uses the existing signing identity and passes strict recursive
+signature verification. Startup logs confirm the watchdog is enabled, General
+reports active hiding, and the saved layout hash is unchanged. The previous app
+is retained at `/Applications/Ice-backups.noindex/Ice-20260926-before-watchdog.app`.
+No artificial system hang or physical lock/unlock cycle was induced for testing;
+the automatic trigger is covered by policy tests and normal live monitoring.
+
 ## Why the old layout pane was empty
 
 On macOS 27.0 (26A428), Ice logged `Missing control item for hidden section` and cleared its entire item cache. MenuBarAgent now composites status items: the old `CGSGetProcessMenuBarWindowList` path does not supply the individual item windows Ice needs. The running app had Accessibility and Screen Recording permission, so resetting those permissions would not repair this discovery path.
@@ -18,6 +54,8 @@ On macOS 27.0 (26A428), Ice logged `Missing control item for hidden section` and
 - Scene dividers no longer expand to enormous widths. Search opens the new searchable editor. On macOS 27 the old separate Ice Bar falls back to the system menu bar, and the ineffective legacy spacing/relaunch control is not offered.
 
 ## Current limits
+
+Input Menu requires excluding both the keyboard system identifier and its separate `com.apple.TextInputMenuAgent` host from the assertion allowlists. On 27.0 (26A428), allowing the host overrides the system-only hiding request. The September 24 repair keeps both lists consistent and restores the host when Input Menu is revealed. Before this repair, verification repeatedly found that single 35-point item, released the assertion, and brought every hidden item back. Accessibility reapproval alone did not resolve it.
 
 Automatic menu bar hiding remains enabled during normal use and section assignment. Pointer checks use the live menu bar height, or only the one-pixel reveal edge while retracted, including fullscreen presentation. Stationary hover retries fresh geometry for up to 1.5 seconds after the configured delay, so slide-down does not require another pointer movement. Clicks are not retried. Occupancy is read on the display containing the pointer; stale editor frames cannot extend the interactive region into application toolbars. Concealment assertions are retained while all menu bars are retracted, and verification resumes from presented display observations on the next refresh. Physical reordering still requires visible endpoints.
 
@@ -161,3 +199,11 @@ verification forever as though the user had hidden the menu bar.
 ### Layout editor identity and icons
 
 Itsycal uses a stable single-item identity so daily date changes do not accumulate stale tiles or break drag lookup. System controls use named, colored symbols; app icons fall back to the installed bundle. Each tile exposes a Move to menu for section assignment, and unsupported items are labeled Managed by macOS.
+
+### Input Menu allowlist repair — 2026-09-24
+
+The installed universal app initially matched both Mach-O UUIDs of the successful GitHub artifact for `mariowabnig/Ice` commit `b688916` (run `36010740216`). Removed the existing Accessibility registration and re-added `/Applications/Ice.app`; the fresh launch passed all permission checks, but hiding still failed. Added `ModernVisibility` unified logging, which isolated `com.apple.TextInputMenuAgent::Item-0` as the remaining visible item at `(1474.5, 0, 35, 30)` after all other requested items were hidden.
+
+Excluding that host when keyboard is concealed resolved the live failure. Release build and all 19 standalone visibility/layout/geometry checks passed, including host exclusion and restoration. The installed local repair is signed with the existing Ice Local Development identity and passes strict recursive signature verification. Three reveal/hide cycles (including closing the layout editor), sustained hiding, and a clean restart confirmed concealed items absent from the MenuBarAgent tree and `confirmedHidden` in runtime logs. All 15 saved assignments were preserved. The follow-up review passed all 52 native XCTest cases, including Hidden/Always Hidden reveal-state coverage, and strict SwiftLint 0.65.1. Diagnostic identifiers and verification results use private logging; the captured machine log stays local. The pre-repair GitHub build remains at `/Applications/Ice-backups.noindex/Ice-20260924-210248.app`.
+
+For the Portworth check, temporarily changed macOS menu bar auto-hide from Always to Never. Portworth restored native rendering; its green dot returned to the same settled position after an additional Ice reveal/conceal cycle. Restored Always and verified the setting in System Settings. Direct pointer-driven auto-hide interaction remains unverified because the native UI driver cannot target the composited MenuBarAgent window. No Portworth code or preferences were changed.

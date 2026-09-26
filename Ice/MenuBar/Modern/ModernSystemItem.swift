@@ -104,6 +104,16 @@ struct ModernVisibilityPlan: Equatable {
         ModernSystemItem.allCases.filter { !systemItems.contains($0) }
     }
 
+    func allowedBundles(runningBundles: Set<String>, ownBundle: String) -> Set<String> {
+        var allowed = runningBundles.subtracting(bundles)
+        // The input menu is hosted by a separate app. Allowing that host
+        // overrides removing keyboard from the system-item allowlist on macOS 27.
+        if systemItems.contains(.keyboard) {
+            allowed.remove("com.apple.TextInputMenuAgent")
+        }
+        return allowed.union([ownBundle])
+    }
+
     func conceals(_ id: ModernItemID) -> Bool {
         if let system = id.systemItem { return systemItems.contains(system) }
         // macOS removes the User menu and optional CC extras whenever ANY

@@ -2,6 +2,36 @@ import XCTest
 @testable import Ice
 
 final class ModernVisibilityLifecycleTests: XCTestCase {
+    func testHiddenInputMenuCannotBeAllowedThroughItsHostBundle() {
+        let running: Set<String> = ["com.apple.TextInputMenuAgent", "example.visible", "example.hidden", "ice"]
+        var plan = ModernVisibilityPlan(bundles: ["example.hidden"], systemItems: [.keyboard])
+        XCTAssertEqual(plan.allowedBundles(runningBundles: running, ownBundle: "ice"), ["example.visible", "ice"])
+        XCTAssertFalse(plan.allowedSystemItems.contains(.keyboard))
+        plan.systemItems = []
+        XCTAssertTrue(plan.allowedBundles(runningBundles: running, ownBundle: "ice").contains("com.apple.TextInputMenuAgent"))
+    }
+
+    func testInputMenuAllowlistFollowsSavedSectionAndRevealState() {
+        let host = "com.apple.TextInputMenuAgent"
+        let running: Set<String> = [host, "example.visible"]
+        for section in ModernMenuBarLayout.Section.allCases {
+            var layout = ModernMenuBarLayout()
+            layout.assignments[ModernSystemItem.keyboard.assignmentKey] = section
+            for revealed: Set<ModernMenuBarLayout.Section> in [[], [.hidden], [.hidden, .alwaysHidden]] {
+                let plan = layout.visibilityPlan(revealing: revealed, runningBundles: running, ownBundle: "ice")
+                let shouldShow = section == .visible || revealed.contains(section)
+                let allowed = plan.allowedBundles(runningBundles: running, ownBundle: "ice")
+                XCTAssertEqual(allowed.contains(host), shouldShow)
+                XCTAssertEqual(plan.allowedSystemItems.contains(.keyboard), shouldShow)
+                XCTAssertTrue(allowed.contains("example.visible"))
+                XCTAssertTrue(allowed.contains("ice"))
+            }
+        }
+        let wifiOnly = ModernVisibilityPlan(systemItems: [.wifi])
+        XCTAssertTrue(wifiOnly.allowedBundles(runningBundles: running, ownBundle: "ice").contains(host))
+        XCTAssertEqual(wifiOnly.allowedBundles(runningBundles: [], ownBundle: "ice"), ["ice"])
+    }
+
     private func item(_ bundle: String, title: String = "Item", x: CGFloat = 0, pid: pid_t = 100) -> ModernMenuBarItem {
         ModernMenuBarItem(
             id: .status(bundle: bundle, title: title),
