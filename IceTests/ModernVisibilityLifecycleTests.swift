@@ -252,3 +252,84 @@ final class ModernVisibilityLifecycleTests: XCTestCase {
         )
     }
 }
+
+private actor DelayedReviewSnapshot {
+    var started = false
+    var calls = 0
+    var continuation: CheckedContinuation<ModernMenuBarSnapshot, Never>?
+    func snapshot() async -> ModernMenuBarSnapshot {
+        started = true
+        calls += 1
+        if calls > 1 { return .unreadable }
+        return await withCheckedContinuation { continuation = $0 }
+    }
+    func release(_ value: ModernMenuBarSnapshot) {
+        continuation?.resume(returning: value)
+        continuation = nil
+    }
+}
+
+extension ModernVisibilityLifecycleTests {
+    @MainActor
+    func testStoppedManagerDiscardsInFlightSnapshot() async throws {
+        let gate = DelayedReviewSnapshot()
+        let manager = ModernMenuBarManager(snapshotOverride: { await gate.snapshot() })
+        let refresh = Task { await manager.refresh() }
+        for _ in 0..<100 {
+            if await gate.started { break }
+            try await Task.sleep(for: .milliseconds(1))
+        }
+        let started = await gate.started
+        XCTAssertTrue(started)
+        manager.stop()
+        await gate.release(ModernMenuBarSnapshot(items: [item("example.late"), systemAnchor()], isReadable: true))
+        await refresh.value
+        XCTAssertTrue(manager.items.isEmpty)
+        XCTAssertNil(manager.errorMessage)
+    }
+}
+
+extension ModernVisibilityLifecycleTests {
+    @MainActor
+    func testWakeDuringSnapshotQueuesImmediateRefresh() async throws {
+        let gate = DelayedReviewSnapshot()
+        let manager = ModernMenuBarManager(snapshotOverride: { await gate.snapshot() })
+        manager.performSetup()
+        defer { manager.stop() }
+        for _ in 0..<100 {
+            if await gate.started { break }
+            try await Task.sleep(for: .milliseconds(1))
+        }
+        let center = NSWorkspace.shared.notificationCenter
+        center.post(name: NSWorkspace.screensDidSleepNotification, object: nil)
+        try await Task.sleep(for: .milliseconds(20))
+        center.post(name: NSWorkspace.screensDidWakeNotification, object: nil)
+        try await Task.sleep(for: .milliseconds(20))
+        await gate.release(.unreadable)
+        try await Task.sleep(for: .milliseconds(50))
+        let calls = await gate.calls
+        XCTAssertEqual(calls, 2, "Wake must not wait for the 20-second backstop")
+    }
+
+    @MainActor
+    func testSessionActivationDoesNotResumeSleepingScreens() async throws {
+        let gate = DelayedReviewSnapshot()
+        let manager = ModernMenuBarManager(snapshotOverride: { await gate.snapshot() })
+        manager.performSetup()
+        defer { manager.stop() }
+        for _ in 0..<100 {
+            if await gate.started { break }
+            try await Task.sleep(for: .milliseconds(1))
+        }
+        await gate.release(.unreadable)
+        try await Task.sleep(for: .milliseconds(20))
+        let center = NSWorkspace.shared.notificationCenter
+        center.post(name: NSWorkspace.screensDidSleepNotification, object: nil)
+        center.post(name: NSWorkspace.sessionDidResignActiveNotification, object: nil)
+        try await Task.sleep(for: .milliseconds(20))
+        center.post(name: NSWorkspace.sessionDidBecomeActiveNotification, object: nil)
+        try await Task.sleep(for: .milliseconds(50))
+        let calls = await gate.calls
+        XCTAssertEqual(calls, 1, "Session activation cannot override screen sleep")
+    }
+}
