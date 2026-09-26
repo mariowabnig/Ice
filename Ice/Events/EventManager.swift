@@ -20,6 +20,8 @@ final class EventManager: ObservableObject {
 
     private var modernInteractionGeneration: UInt64 = 0
     private var modernEmptySpaceTask: Task<Void, Never>?
+    private var modernIntentIsHover = false
+    private var rehideTask: Task<Void, Never>?
 
     // MARK: Monitors
 
@@ -71,7 +73,7 @@ final class EventManager: ObservableObject {
         option: .listenOnly
     ) { [weak self] _, event in
         if let self, let appState, let screen = bestScreen(appState: appState) {
-            cancelModernEmptySpaceAction()
+            if modernIntentIsHover { cancelModernEmptySpaceAction() }
             handleShowOnHover(appState: appState, screen: screen)
         }
         return event
@@ -147,6 +149,8 @@ final class EventManager: ObservableObject {
 
     /// Stops all monitors.
     func stopAll() {
+        rehideTask?.cancel()
+        rehideTask = nil
         cancelModernEmptySpaceAction()
         for monitor in allMonitors {
             monitor.stop()
@@ -405,6 +409,9 @@ extension EventManager {
     // MARK: Handle Show On Hover
 
     private func handleShowOnHover(appState: AppState, screen: NSScreen) {
+        rehideTask?.cancel()
+        rehideTask = nil
+        if modernEmptySpaceTask != nil && !modernIntentIsHover { return }
         // Make sure the "ShowOnHover" feature is enabled and allowed.
         guard
             appState.settings.general.showOnHover,
@@ -433,8 +440,9 @@ extension EventManager {
             guard isMouseInsideEmptyMenuBarSpace(appState: appState, screen: screen) else {
                 return
             }
-            Task {
-                try await Task.sleep(for: .seconds(delay))
+            rehideTask = Task {
+                do { try await Task.sleep(for: .seconds(delay)) } catch { return }
+                guard !Task.isCancelled else { return }
                 // Make sure the feature is still enabled and the mouse is still inside.
                 guard
                     appState.settings.general.showOnHover,
@@ -451,8 +459,9 @@ extension EventManager {
             else {
                 return
             }
-            Task {
-                try await Task.sleep(for: .seconds(delay))
+            rehideTask = Task {
+                do { try await Task.sleep(for: .seconds(delay)) } catch { return }
+                guard !Task.isCancelled else { return }
                 // Make sure the feature is still enabled and the mouse is still outside.
                 guard
                     appState.settings.general.showOnHover,
@@ -532,8 +541,12 @@ extension EventManager {
               waitsForMenuBar || isModernEmptySpaceCandidate(appState: appState, screen: screen),
               let point = MouseHelpers.locationCoreGraphics else { return }
         cancelModernEmptySpaceAction()
+        modernIntentIsHover = waitsForMenuBar
         let intent = ModernMenuBarInteractionIntent(point: point, generation: modernInteractionGeneration)
         modernEmptySpaceTask = Task { [weak self] in
+            defer {
+                if self?.modernInteractionGeneration == intent.generation { self?.modernEmptySpaceTask = nil }
+            }
             if delay > 0 {
                 do { try await Task.sleep(for: .seconds(delay)) } catch { return }
             }

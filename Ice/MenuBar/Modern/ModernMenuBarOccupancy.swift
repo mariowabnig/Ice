@@ -57,6 +57,7 @@ struct ModernMenuBarInteractionIntent {
     let generation: UInt64
 
     func isCurrent(point: CGPoint?, generation: UInt64) -> Bool {
-        self.generation == generation && self.point == point
+        guard self.generation == generation, let point else { return false }
+        return hypot(self.point.x - point.x, self.point.y - point.y) <= 4
     }
 }
